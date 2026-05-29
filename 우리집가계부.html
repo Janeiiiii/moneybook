@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="우리집 가계부"/>
+<title>🏡 우리집 가계부</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+/* ── Toss Design System ── */
+:root {
+  --blue: #3182F6;
+  --blue-light: #EBF3FE;
+  --green: #1CD66B;
+  --green-light: #E8FAF0;
+  --red: #F04452;
+  --red-light: #FEF0F1;
+  --orange: #FF6B00;
+  --gray-50: #F9FAFB;
+  --gray-100: #F2F4F6;
+  --gray-200: #E5E8EB;
+  --gray-300: #D1D6DB;
+  --gray-400: #ADB5BD;
+  --gray-500: #8B95A1;
+  --gray-600: #6B7684;
+  --gray-700: #4E5968;
+  --gray-800: #333D4B;
+  --gray-900: #191F28;
+  --white: #FFFFFF;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.10);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;padding:0;font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:var(--gray-100);color:var(--gray-900);-webkit-font-smoothing:antialiased;font-size:16px;}
+input,button,select,textarea{font-family:inherit;}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+button:active{opacity:0.75;}
+::-webkit-scrollbar{width:0;}
+
+/* Toss-style card */
+.t-card{background:var(--white);border-radius:var(--radius-lg);padding:20px;margin-bottom:10px;box-shadow:var(--shadow-sm);overflow:hidden;}
+.t-section-title{font-size:18px;font-weight:700;color:var(--gray-900);margin-bottom:16px;}
+.t-label{font-size:13px;font-weight:600;color:var(--gray-500);letter-spacing:0.3px;}
+.t-amount-lg{font-size:24px;font-weight:800;color:var(--gray-900);}
+.t-amount-md{font-size:18px;font-weight:700;color:var(--gray-900);}
+.t-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:13px;font-weight:600;}
+.t-chip-blue{background:var(--blue-light);color:var(--blue);}
+.t-chip-green{background:var(--green-light);color:#0F9648;}
+.t-chip-red{background:var(--red-light);color:var(--red);}
+
+/* Input */
+.t-input{width:100%;background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:var(--radius-md);color:var(--gray-900);font-size:17px;font-weight:600;padding:14px 16px;outline:none;transition:border-color 0.15s;}
+.t-input:focus{border-color:var(--blue);background:var(--white);}
+.t-input-sm{width:100%;background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);color:var(--gray-900);font-size:16px;font-weight:600;padding:12px 14px;outline:none;transition:border-color 0.15s;}
+.t-input-sm:focus{border-color:var(--blue);background:var(--white);}
+
+/* Divider */
+.t-divider{height:1px;background:var(--gray-100);margin:12px 0;}
+
+/* Row */
+.t-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;}
+.t-row-label{font-size:15px;color:var(--gray-600);}
+.t-row-value{font-size:15px;font-weight:600;color:var(--gray-900);}
+
+/* Category group header */
+.t-cat-header{display:flex;justify-content:space-between;align-items:center;padding:14px 0 8px;}
+.t-cat-title{font-size:16px;font-weight:800;color:var(--gray-900);}
+.t-cat-total{font-size:16px;font-weight:700;}
+
+/* Section pill */
+.t-sec-pill{display:inline-flex;align-items:center;gap:6px;background:var(--gray-100);border-radius:20px;padding:6px 14px;font-size:14px;font-weight:700;color:var(--gray-700);margin:8px 0 12px;}
+
+/* Item card */
+.t-item{background:var(--gray-50);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:8px;}
+.t-item-name{font-size:15px;font-weight:600;color:var(--gray-900);margin-bottom:4px;}
+.t-item-meta{font-size:13px;color:var(--gray-500);}
+.t-item-input-row{margin-top:10px;display:flex;align-items:center;gap:8px;}
+
+/* Toggle button */
+.t-toggle{width:100%;padding:14px 16px;border-radius:var(--radius-md);border:1.5px solid var(--gray-200);background:var(--gray-50);color:var(--gray-700);font-size:15px;font-weight:600;text-align:left;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.t-toggle.active{background:var(--blue-light);border-color:var(--blue);color:var(--blue);}
+
+/* Diff badge */
+.t-diff{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700;}
+.t-diff-pos{background:#E8FAF0;color:#0F9648;}
+.t-diff-neg{background:var(--red-light);color:var(--red);}
+
+/* Summary diff box */
+.t-diff-box{border-radius:var(--radius-md);padding:14px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;}
+.t-diff-box-pos{background:#E8FAF0;}
+.t-diff-box-neg{background:var(--red-light);}
+
+/* Nav */
+.t-nav-btn{padding:10px 16px;border-radius:var(--radius-sm);background:transparent;border:none;font-size:15px;font-weight:600;color:var(--gray-600);cursor:pointer;}
+.t-nav-btn.active{background:var(--blue-light);color:var(--blue);}
+
+/* Arrow button */
+.t-arrow{width:36px;height:36px;border-radius:var(--radius-sm);background:var(--gray-100);border:none;color:var(--gray-600);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+/* Save button */
+.t-save-btn{width:100%;padding:17px;border:none;border-radius:var(--radius-lg);font-size:17px;font-weight:700;cursor:pointer;color:white;background:var(--blue);}
+.t-save-btn.saved{background:#0F9648;}
+.t-save-btn.saving{background:var(--gray-400);}
+.t-save-btn.error{background:var(--red);}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+@keyframes pinShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-10px);}40%{transform:translateX(10px);}60%{transform:translateX(-6px);}80%{transform:translateX(6px);}}
+@keyframes spin{to{transform:rotate(360deg);}}
+.fade-in{animation:fadeIn 0.22s ease;}
+.spin{animation:spin 1s linear infinite;display:inline-block;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+var db=null;
+try{firebase.initializeApp({apiKey:"AIzaSyByyxptM93jgDZvn5e8vHj_7cKTYJOxxiY",authDomain:"moneybook-23e35.firebaseapp.com",projectId:"moneybook-23e35"});db=firebase.firestore();}catch(e){console.error("FB init fail",e);}
+function fbSet(id,data){if(!db)return Promise.resolve(false);return db.collection("household").doc(id).set(data,{merge:true}).then(function(){return true;}).catch(function(e){console.error(e);return false;});}
+function fbListen(id,cb){if(!db){setTimeout(function(){cb(null);},200);return function(){};}return db.collection("household").doc(id).onSnapshot(function(s){cb(s.exists?s.data():null);},function(e){console.error(e);cb(null);});}
+
+var MONTHS=["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+function getKST(){var u=Date.now()+(new Date().getTimezoneOffset()*60000);return new Date(u+9*60*60000);}
+function fmt(n,u){u=u||"원";if(n===null||n===undefined||n==="")return"—";return Math.round(Number(n)).toLocaleString("ko-KR")+u;}
+function fmtPct(n){if(!n&&n!==0)return"—";return(Math.round(Number(n)*10)/10).toFixed(1)+"%";}
+function sign(n){return n>=0?"+":"";}
+function N(v,fb){var r=Number(v);return isNaN(r)?fb:r;}
+
+var LOAN_BASE={rate:3.977,totalInstallments:480,startInstallment:10,baseMonth:{year:2026,month:4},baseBalance:244273746,monthlyPayment:1026286,basePrincipal:216007,baseInterest:810279,autoTransferUntil:"2027.09"};
+function calcLoan(cfg,year,month){var base=cfg||LOAN_BASE;var diff=(year-base.baseMonth.year)*12+(month-base.baseMonth.month);var inst=base.startInstallment+diff;if(inst<1||inst>base.totalInstallments)return null;var r=base.rate/100/12;var bal=N(base.baseBalance,0),prin=N(base.basePrincipal,0),intr=N(base.baseInterest,0);if(diff>0){for(var i=0;i<diff;i++){intr=Math.round(bal*r);prin=Math.round(base.monthlyPayment-intr);bal=bal-prin;}}else if(diff<0){bal=N(base.baseBalance,0)+N(base.basePrincipal,0)*Math.abs(diff);intr=Math.round(bal*r);prin=Math.round(base.monthlyPayment-intr);}return{installment:inst,monthlyPayment:N(base.monthlyPayment,0),principal:Math.round(prin),interest:Math.round(intr),balance:Math.round(diff>0?bal:N(base.baseBalance,0)+N(base.basePrincipal,0)*Math.abs(diff)),remaining:base.totalInstallments-inst};}
+function getEventExp(year,month){if(year>2026||(year===2026&&month>=11)){if(month===11)return{amount:1600000,detail:"부모님 용돈 (연 1회)"};return{amount:70000,detail:"경조사비"};}return{amount:200000,detail:"경조사비 (부모님 용돈/선물)"};}
+
+var DEFAULT_SETTINGS={wife:{savings:[{id:"도약적금",label:"도약적금",emoji:"💰",amount:500000}],expenses:[{id:"고정비_나",label:"고정비 (보험포함, 관리비)",emoji:"🤑",amount:900000},{id:"용돈_나",label:"용돈",emoji:"💵",amount:300000}]},husband:{income_extra:[{id:"떡값1",label:"떡값 1️⃣",emoji:"💰",amount:1000000,info:"재산세 통장으로"},{id:"떡값2",label:"떡값 2️⃣",emoji:"💰",amount:1000000,info:"자동차 보험, 세금"}],savings:[{id:"주식",label:"주식",emoji:"📈",amount:800000}],expenses:[{id:"비상금",label:"비상금",emoji:"🛡️",amount:150000},{id:"마미대출",label:"마미(대출)",emoji:"💸",amount:170000},{id:"경조사비",label:"경조사비",emoji:"🎁",amount:200000,info:"부모님 용돈/선물"},{id:"생활비",label:"생활비",emoji:"🛒",amount:550000},{id:"여행비",label:"여행비",emoji:"✈️",amount:250000},{id:"고정비_남",label:"고정비",emoji:"🤑",amount:362040},{id:"용돈_남",label:"용돈",emoji:"💵",amount:160000}]},loan:{rate:3.977,totalInstallments:480,startInstallment:10,baseMonth:{year:2026,month:4},baseBalance:244273746,monthlyPayment:1026286,basePrincipal:216007,baseInterest:810279,autoTransferUntil:"2027.09"}};
+var SECRET_QS=["처음 키운 반려동물 이름은?","초등학교 때 별명은?","부모님이 처음 만난 장소는?","어릴 때 가장 좋아했던 음식은?","첫 번째 직장 이름은?","가장 친한 친구 이름은?","태어난 병원 이름은?","두 사람이 처음 만난 곳은?"];
+function loadLS(k,fb){try{var v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch(e){return fb;}}
+function saveLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+var kst=getKST();
+var STATE={unlocked:false,menu:"dashboard",sideOpen:false,year:kst.getFullYear(),month:kst.getMonth(),settingsTab:"main",statsOpen:false,statsPeriod:"3m",monthPickerOpen:false,tooltip:null,syncStatus:"idle",allData:{},settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),settingsHistory:[],fbLoaded:false};
+var _L=[];
+function getS(){return STATE;}
+function setS(p){for(var k in p)STATE[k]=p[k];for(var i=0;i<_L.length;i++)_L[i](STATE);}
+function sub(fn){_L.push(fn);}
+
+var _fbStarted=false,_allL=false,_setL=false;
+function checkReady(){if(_allL&&_setL)setS({fbLoaded:true});}
+function startFB(){
+  if(_fbStarted)return;_fbStarted=true;
+  setTimeout(function(){if(!STATE.fbLoaded)setS({fbLoaded:true});},8000);
+  fbListen("allData",function(d){setS({allData:d||{}});_allL=true;checkReady();});
+  fbListen("settings",function(d){if(d)setS({settings:mergeS(d)});_setL=true;checkReady();});
+  fbListen("settingsHistory",function(d){setS({settingsHistory:(d&&d.list)||[]});});
+}
+function mergeS(d){try{var s=JSON.parse(JSON.stringify(DEFAULT_SETTINGS));if(d.wife){if(d.wife.savings&&d.wife.savings.length)s.wife.savings=d.wife.savings;if(d.wife.expenses&&d.wife.expenses.length)s.wife.expenses=d.wife.expenses;}if(d.husband){if(d.husband.income_extra&&d.husband.income_extra.length)s.husband.income_extra=d.husband.income_extra;if(d.husband.savings&&d.husband.savings.length)s.husband.savings=d.husband.savings;if(d.husband.expenses&&d.husband.expenses.length)s.husband.expenses=d.husband.expenses;}if(d.loan){s.loan={};for(var kk in LOAN_BASE)s.loan[kk]=LOAN_BASE[kk];for(var kk in d.loan)s.loan[kk]=d.loan[kk];}return s;}catch(e){return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));}}
+
+function compute(){
+  var s=STATE,year=s.year,month=s.month,mKey=year+"-"+month,md=s.allData[mKey]||{},cfg=s.settings.loan||LOAN_BASE;
+  function g(f,fb){return md[f]!==undefined?md[f]:fb;}
+  var wS=N(g("wifeSalary",0),0),hS=N(g("husbandSalary",0),0);
+  var ex=s.settings.husband.income_extra||[];
+  var t1=g("tteok1Active",false),t2=g("tteok2Active",false);
+  var t1a=t1?N(g("tteok1Amt",(ex[0]||{}).amount||0),(ex[0]||{}).amount||0):0;
+  var t2a=t2?N(g("tteok2Amt",(ex[1]||{}).amount||0),(ex[1]||{}).amount||0):0;
+  var wT=wS,hT=hS+t1a+t2a,totI=wT+hT;
+  var li=calcLoan(cfg,year,month);
+  var lP=li?li.principal:N(cfg.basePrincipal,0),lI=li?li.interest:N(cfg.baseInterest,0),lB=li?li.balance:N(cfg.baseBalance,0);
+  var evE=getEventExp(year,month),evA=N(g("경조사비_amt",evE.amount),evE.amount);
+  var ws=s.settings.wife.savings||[],we=s.settings.wife.expenses||[];
+  var wSav0=N(g((ws[0]||{id:"도약적금"}).id+"_amt",(ws[0]||{}).amount||500000),(ws[0]||{}).amount||500000);
+  var wExp0=N(g((we[0]||{id:"고정비_나"}).id+"_amt",(we[0]||{}).amount||900000),(we[0]||{}).amount||900000);
+  var wExp1=N(g((we[1]||{id:"용돈_나"}).id+"_amt",(we[1]||{}).amount||300000),(we[1]||{}).amount||300000);
+  var wSavX=ws.slice(1).reduce(function(a,it){return a+N(g(it.id+"_amt",it.amount),it.amount);},0);
+  var wExpX=we.slice(2).reduce(function(a,it){return a+N(g(it.id+"_amt",it.amount),it.amount);},0);
+  var wFixed=wSav0+wSavX+wExp0+wExp1+wExpX+lI+lP;
+  var wBBa=Math.max(0,wT-wFixed);
+  var wBBs=g("비비상금_나_amt","");var wBB=wBBs!==""?N(wBBs,wBBa):wBBa;
+  var wTS=wSav0+wSavX+lP+wBB,wTE=wExp0+wExp1+wExpX+lI,wGO=wTS+wTE,wD=wT-wGO;
+  var hs=s.settings.husband.savings||[],he=s.settings.husband.expenses||[];
+  var hSav0=N(g((hs[0]||{id:"주식"}).id+"_amt",(hs[0]||{}).amount||800000),(hs[0]||{}).amount||800000);
+  var hSavX=hs.slice(1).reduce(function(a,it){return a+N(g(it.id+"_amt",it.amount),it.amount);},0);
+  var h비상금=N(g("비상금_amt",150000),150000),h마미=N(g("마미대출_amt",170000),170000),h생활=N(g("생활비_amt",550000),550000),h여행=N(g("여행비_amt",250000),250000),h고정=N(g("고정비_남_amt",362040),362040),h용돈=N(g("용돈_남_amt",160000),160000);
+  var hExpX=he.slice(7).reduce(function(a,it){return a+N(g(it.id+"_amt",it.amount),it.amount);},0);
+  var hFixed=hSav0+hSavX+h비상금+h마미+evA+h생활+h여행+h고정+h용돈+hExpX;
+  var hBBa=Math.max(0,hT-hFixed);var hBBs=g("비비상금_남_amt","");var hBB=hBBs!==""?N(hBBs,hBBa):hBBa;
+  var hTS=hSav0+hSavX+hBB,hTE=h비상금+h마미+evA+h생활+h여행+h고정+h용돈+hExpX,hGO=hTS+hTE,hD=hT-hGO;
+  var totE=wTE+hTE,totS=wTS+hTS;
+  return{mKey:mKey,md:md,g:g,lCfg:cfg,wS:wS,hS:hS,t1:t1,t2:t2,t1a:t1a,t2a:t2a,wT:wT,hT:hT,totI:totI,li:li,lP:lP,lI:lI,lB:lB,evE:evE,evA:evA,wSav0:wSav0,wExp0:wExp0,wExp1:wExp1,wBBa:wBBa,wBB:wBB,hSav0:hSav0,h비상금:h비상금,h마미:h마미,h생활:h생활,h여행:h여행,h고정:h고정,h용돈:h용돈,hBBa:hBBa,hBB:hBB,wTS:wTS,wTE:wTE,wGO:wGO,wD:wD,hTS:hTS,hTE:hTE,hGO:hGO,hD:hD,totE:totE,totS:totS};
+}
+
+// DOM helper
+function h(tag,attrs){
+  var el=document.createElement(tag);
+  if(attrs)for(var k in attrs){var v=attrs[k];if(k==="style"&&typeof v==="object"){for(var sk in v)el.style[sk]=v[sk];}else if(k==="className"){el.className=v;}else if(k==="innerHTML"){el.innerHTML=v;}else if(k==="disabled"){if(v)el.disabled=true;}else if(k.charAt(0)==="o"&&k.charAt(1)==="n"&&typeof v==="function"){el.addEventListener(k.slice(2).toLowerCase(),v);}else{el.setAttribute(k,v);}}
+  for(var i=2;i<arguments.length;i++){var c=arguments[i];if(c==null||c===false||c===undefined)continue;if(Array.isArray(c)){for(var j=0;j<c.length;j++){if(c[j]!=null&&c[j]!==false)el.appendChild(typeof c[j]==="string"?document.createTextNode(c[j]):c[j]);}}else{el.appendChild(typeof c==="string"||typeof c==="number"?document.createTextNode(String(c)):c);}}
+  return el;
+}
+function el(tag,style){var e=document.createElement(tag);if(style)for(var k in style)e.style[k]=style[k];for(var i=2;i<arguments.length;i++){var c=arguments[i];if(c==null||c===false)continue;e.appendChild(typeof c==="string"?document.createTextNode(c):c);}return e;}
+function card(children_array){var e=document.createElement("div");e.className="toss-card";if(Array.isArray(children_array)){for(var i=0;i<children_array.length;i++){if(children_array[i])e.appendChild(children_array[i]);}}return e;}
+function arrowBtn(label,onClick){return h("button",{style:{background:"#F2F4F6",border:"none",color:"#8B95A1",fontSize:"18px",width:"36px",height:"36px",borderRadius:"10px",cursor:"pointer",lineHeight:"1",flexShrink:"0"},onClick:onClick},label);}
+function divider(){return h("div",{style:{height:"1px",background:"#F2F4F6",margin:"8px 0"}});}
+
+/* ── Toss-style section header */
+function secHeader(emoji,title,amount,amtColor){
+  var e=document.createElement("div");
+  e.style.cssText="display:flex;align-items:center;justify-content:space-between;padding:4px 0 10px;border-bottom:2px solid #F2F4F6;margin-bottom:10px;";
+  var left=document.createElement("div");left.style.cssText="display:flex;align-items:center;gap:8px;";
+  var ico=document.createElement("span");ico.style.fontSize="18px";ico.textContent=emoji;
+  var ttl=document.createElement("span");ttl.style.cssText="font-size:17px;font-weight:700;color:#191F28;";ttl.textContent=title;
+  left.appendChild(ico);left.appendChild(ttl);
+  e.appendChild(left);
+  if(amount!==undefined){var amt=document.createElement("span");amt.style.cssText="font-size:16px;font-weight:800;color:"+(amtColor||"#3182F6")+";";amt.textContent=fmt(amount);e.appendChild(amt);}
+  return e;
+}
+
+/* ── Toss-style item row (label on top, input below) */
+function itemRowToss(label,emoji,defVal,storeKey,info,highlight,c,setMD){
+  var cur=N(c.md[storeKey]!==undefined?c.md[storeKey]:defVal,defVal);
+  var diff=cur-defVal,hasDiff=Math.abs(diff)>0;
+  var wrap=document.createElement("div");
+  wrap.style.cssText="background:"+(highlight?"#EBF3FE":"transparent")+";border-radius:"+(highlight?"12px":"0")+";padding:"+(highlight?"14px 12px":"12px 0")+";border-bottom:"+(highlight?"none":"1px solid #F2F4F6")+";margin-bottom:4px;";
+
+  /* Label row */
+  var labelRow=document.createElement("div");labelRow.style.cssText="display:flex;align-items:center;gap:6px;margin-bottom:8px;";
+  var emoSpan=document.createElement("span");emoSpan.style.fontSize="16px";emoSpan.textContent=emoji;
+  var labelTxt=document.createElement("span");labelTxt.style.cssText="font-size:15px;font-weight:600;color:#191F28;flex:1;";labelTxt.textContent=label;
+  labelRow.appendChild(emoSpan);labelRow.appendChild(labelTxt);
+  if(info){var tipBtn=document.createElement("button");tipBtn.style.cssText="background:none;border:none;color:#B0B8C1;font-size:13px;cursor:pointer;padding:0 2px;line-height:1;";tipBtn.textContent="ⓘ";tipBtn.addEventListener("click",function(e){setS({tooltip:{text:info,x:e.clientX,y:e.clientY}});setTimeout(function(){setS({tooltip:null});},3000);});labelRow.appendChild(tipBtn);}
+  wrap.appendChild(labelRow);
+
+  /* Meta row */
+  if(c.totI>0||hasDiff){
+    var metaRow=document.createElement("div");metaRow.style.cssText="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;";
+    if(c.totI>0){var pct=document.createElement("span");pct.className="toss-chip chip-blue";pct.textContent=fmtPct(cur/c.totI*100);metaRow.appendChild(pct);}
+    if(hasDiff){var dc=document.createElement("span");dc.className="toss-chip "+(diff>0?"chip-red":"chip-green");dc.textContent=sign(diff)+fmt(diff)+" ("+sign(diff/defVal*100)+fmtPct(Math.abs(diff/defVal*100))+")";metaRow.appendChild(dc);}
+    wrap.appendChild(metaRow);
+  }
+
+  /* Input row */
+  var inpRow=document.createElement("div");inpRow.style.cssText="display:flex;align-items:center;gap:8px;";
+  var inp=document.createElement("input");inp.type="number";inp.className="toss-input";inp.value=c.md[storeKey]!==undefined?c.md[storeKey]:defVal;
+  inp.addEventListener("change",function(e){var p={};p[storeKey]=e.target.value;setMD(p);});
+  var unit=document.createElement("span");unit.style.cssText="font-size:14px;color:#8B95A1;white-space:nowrap;flex-shrink:0;";unit.textContent="원";
+  inpRow.appendChild(inp);inpRow.appendChild(unit);
+  wrap.appendChild(inpRow);
+  return wrap;
+}
+
+/* ── PIN SCREEN */
+function renderPin(){
+  var savedPin=loadLS("hh_pin",null),phase=savedPin?"enter":"set",inp="",firstPin="";
+  var root=h("div",{style:{minHeight:"100vh",background:"#f5f6fa",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}});
+  var wrap=h("div",{style:{width:"100%",maxWidth:"360px",display:"flex",flexDirection:"column",alignItems:"center",gap:"12px"}});
+  var titleEl=h("div",{style:{fontSize:"24px",fontWeight:"800",color:"#191F28"}});
+  var subEl=h("div",{style:{fontSize:"15px",color:"#8B95A1",marginBottom:"8px"}});
+  var dotsWrap=h("div",{style:{display:"flex",gap:"18px",marginBottom:"4px"}});
+  var dots=[];for(var di=0;di<4;di++){var d=h("div",{style:{width:"18px",height:"18px",borderRadius:"50%",background:"#E5E8EB",border:"2px solid #E5E8EB",transition:"all 0.15s"}});dots.push(d);dotsWrap.appendChild(d);}
+  var errEl=h("div",{style:{fontSize:"14px",color:"#F04452",textAlign:"center",minHeight:"20px"}});
+  var keypad=h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"12px",width:"100%",maxWidth:"300px",marginTop:"12px"}});
+  var resetBtn=h("button",{style:{marginTop:"20px",background:"none",border:"none",color:"#B0B8C1",fontSize:"14px",cursor:"pointer",textDecoration:"underline"}},"PIN 분실 시 재설정");
+  function upd(){var T={set:"PIN 설정",confirm:"PIN 확인",enter:"PIN 입력"};var SB={set:"4자리 PIN을 설정해 주세요",confirm:"한 번 더 입력해 주세요",enter:"PIN을 입력해 주세요"};titleEl.textContent=T[phase];subEl.textContent=SB[phase];for(var i=0;i<4;i++){var f=i<inp.length;dots[i].style.background=f?"#3182F6":"#E5E8EB";dots[i].style.border="2px solid "+(f?"#3182F6":"#E5E8EB");}resetBtn.style.display=phase==="enter"?"block":"none";}
+  function shake(msg){errEl.textContent=msg;inp="";upd();dotsWrap.style.animation="pinShake 0.4s ease";setTimeout(function(){dotsWrap.style.animation="";},500);}
+  function onDigit(d){if(inp.length>=4)return;inp+=d;errEl.textContent="";upd();if(inp.length===4)setTimeout(function(){complete(inp);},120);}
+  function complete(p){var sp=loadLS("hh_pin",null);if(phase==="set"){firstPin=p;inp="";phase="confirm";upd();}else if(phase==="confirm"){if(p===firstPin){saveLS("hh_pin",p);setS({unlocked:true});startFB();render();}else{shake("PIN이 일치하지 않아요.");phase="set";firstPin="";}}else{if(p===sp){setS({unlocked:true});startFB();render();}else shake("PIN이 틀렸어요.");}}
+  resetBtn.addEventListener("click",function(){var sq=loadLS("hh_secret_q",null);if(!sq){alert("비밀 질문이 없어요.\n설정 → 🔐 보안 탭에서 먼저 설정해 주세요.");return;}var ans=window.prompt("비밀 질문: "+sq.question+"\n\n답변을 입력하세요:");if(ans===null)return;if(ans.trim().toLowerCase()===sq.answer.trim().toLowerCase()){localStorage.removeItem("hh_pin");alert("PIN 초기화됐어요.");phase="set";inp="";firstPin="";upd();}else alert("답변이 틀렸어요.");});
+  var keys=["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  for(var ki=0;ki<keys.length;ki++){(function(k){var btn;if(k===""){btn=h("div",{style:{height:"68px"}});}else{btn=h("button",{style:{height:"68px",fontSize:"26px",fontWeight:"600",background:"#fff",border:"1px solid #E5E8EB",borderRadius:"16px",color:k==="⌫"?"#B0B8C1":"#191F28",cursor:"pointer",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}},k);btn.addEventListener("click",function(){if(k==="⌫"){inp=inp.slice(0,-1);errEl.textContent="";upd();}else onDigit(k);});}keypad.appendChild(btn);})(keys[ki]);}
+  upd();
+  wrap.appendChild(h("div",{style:{fontSize:"52px",marginBottom:"4px"}},"🏡"));wrap.appendChild(h("div",{style:{fontSize:"20px",fontWeight:"800",color:"#191F28",marginBottom:"6px"}},"우리집 가계부"));wrap.appendChild(titleEl);wrap.appendChild(subEl);wrap.appendChild(dotsWrap);wrap.appendChild(errEl);wrap.appendChild(keypad);wrap.appendChild(resetBtn);root.appendChild(wrap);return root;
+}
+
+/* ── LOADING */
+function renderLoading(){
+  return h("div",{style:{minHeight:"100vh",background:"#f5f6fa",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"16px",padding:"20px"}},
+    h("div",{style:{fontSize:"52px"}},"🏡"),h("div",{style:{fontSize:"17px",fontWeight:"700",color:"#191F28"}},"우리집 가계부"),
+    h("div",{className:"spin",style:{width:"28px",height:"28px",border:"3px solid #E5E8EB",borderTopColor:"#3182F6",borderRadius:"50%"}}),
+    h("div",{style:{fontSize:"14px",color:"#8B95A1",textAlign:"center"}},"데이터 불러오는 중..."),
+    h("button",{style:{marginTop:"12px",padding:"12px 28px",background:"#fff",border:"1px solid #E5E8EB",borderRadius:"12px",color:"#8B95A1",fontSize:"14px",cursor:"pointer",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"},onClick:function(){setS({fbLoaded:true});}}, "건너뛰고 시작")
+  );
+}
+
+/* ── SHELL */
+function renderShell(){
+  var s=STATE,c=compute();
+  var syncColors={idle:"transparent",saving:"#FF9500",saved:"#00C471",error:"#F04452"};
+  /* Sidebar */
+  var sb=h("div",{style:{position:"fixed",top:"0",left:"0",bottom:"0",width:"260px",background:"#fff",borderRight:"1px solid #F2F4F6",zIndex:"200",transform:s.sideOpen?"translateX(0)":"translateX(-100%)",transition:"transform 0.25s ease",display:"flex",flexDirection:"column",boxShadow:"4px 0 20px rgba(0,0,0,0.08)"}});
+  sb.appendChild(h("div",{style:{display:"flex",alignItems:"center",gap:"12px",padding:"24px 20px",borderBottom:"1px solid #F2F4F6"}},h("span",{style:{fontSize:"24px"}},"🏡"),h("span",{style:{fontSize:"16px",fontWeight:"800",color:"#191F28",flex:"1"}},"우리집 가계부"),h("button",{style:{background:"none",border:"none",color:"#B0B8C1",fontSize:"22px",cursor:"pointer",lineHeight:"1"},onClick:function(){setS({sideOpen:false});}}, "✕")));
+  var nav=h("nav",{style:{display:"flex",flexDirection:"column",padding:"16px 12px",gap:"4px"}});
+  [["dashboard","📊","대시보드"],["ledger","📝","가계부 작성"],["settings","⚙️","설정"]].forEach(function(m){nav.appendChild(h("button",{style:{display:"flex",alignItems:"center",gap:"14px",padding:"14px 16px",borderRadius:"14px",border:"none",background:s.menu===m[0]?"#EBF3FE":"transparent",color:s.menu===m[0]?"#3182F6":"#4E5968",cursor:"pointer",fontSize:"16px",textAlign:"left",width:"100%",fontWeight:s.menu===m[0]?"700":"500"},onClick:function(){setS({menu:m[0],sideOpen:false});}},h("span",{style:{fontSize:"22px"}},m[1]),m[2]));});
+  if(s.menu==="settings"){[["main","설정 메인"],["history","항목별 수정 내용"],["security","🔐 PIN·보안 설정"]].forEach(function(m){nav.appendChild(h("button",{style:{padding:"10px 16px 10px 54px",borderRadius:"10px",border:"none",background:s.settingsTab===m[0]?"#EBF3FE":"transparent",color:s.settingsTab===m[0]?"#3182F6":"#8B95A1",cursor:"pointer",fontSize:"14px",textAlign:"left",width:"100%",fontWeight:s.settingsTab===m[0]?"600":"400"},onClick:function(){setS({settingsTab:m[0],sideOpen:false});}},m[1]));});}
+  sb.appendChild(nav);
+  var ov=s.sideOpen?h("div",{style:{position:"fixed",inset:"0",background:"rgba(0,0,0,0.2)",zIndex:"150"},onClick:function(){setS({sideOpen:false});}}):"";
+  var syncDot=h("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:syncColors[s.syncStatus]||"transparent",transition:"background 0.3s",flexShrink:"0"}});
+  var menuTitles={dashboard:"📊 대시보드",ledger:"📝 가계부 작성",settings:"⚙️ 설정"};
+  var topbar=h("header",{style:{position:"sticky",top:"0",zIndex:"100",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 18px",background:"#fff",borderBottom:"1px solid #F2F4F6",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}},
+    h("button",{style:{width:"40px",height:"40px",display:"flex",flexDirection:"column",justifyContent:"center",gap:"5px",background:"none",border:"none",cursor:"pointer",padding:"8px"},onClick:function(){setS({sideOpen:true});}},h("span",{style:{display:"block",height:"2px",background:"#8B95A1",borderRadius:"2px"}}),h("span",{style:{display:"block",height:"2px",background:"#8B95A1",borderRadius:"2px"}}),h("span",{style:{display:"block",height:"2px",background:"#8B95A1",borderRadius:"2px"}})),
+    h("div",{style:{display:"flex",alignItems:"center",gap:"10px"}},h("span",{style:{fontSize:"17px",fontWeight:"700",color:"#191F28"}},menuTitles[s.menu]||""),syncDot),
+    h("div",{style:{width:"40px"}})
+  );
+  var page;
+  if(s.menu==="dashboard")page=renderDashboard(c);
+  else if(s.menu==="ledger")page=renderLedger(c);
+  else page=renderSettings(c);
+  var tip="";
+  if(s.tooltip){tip=h("div",{style:{position:"fixed",background:"#191F28",color:"#fff",fontSize:"13px",padding:"10px 14px",borderRadius:"12px",zIndex:"9999",maxWidth:"240px",boxShadow:"0 4px 20px rgba(0,0,0,0.2)",top:Math.min(s.tooltip.y+12,window.innerHeight-80)+"px",left:Math.min(Math.max(s.tooltip.x-60,10),window.innerWidth-250)+"px",pointerEvents:"none",lineHeight:"1.5",wordBreak:"keep-all"}},s.tooltip.text);}
+  var root=h("div",{style:{minHeight:"100vh",background:"#f5f6fa",width:"100%",overflow:"hidden"}},sb);
+  if(ov)root.appendChild(ov);root.appendChild(topbar);root.appendChild(h("main",{style:{padding:"16px 16px 80px",background:"#f5f6fa"}},page));if(tip)root.appendChild(tip);
+  return root;
+}
+
+/* ── DASHBOARD */
+function renderDashboard(c){
+  var s=STATE; var year=s.year, month=s.month;
+  var gd=[];
+  for(var gi=5;gi>=0;gi--){
+    var gm=month-gi,gy=year; if(gm<0){gm+=12;gy--;}
+    var gdata=s.allData[gy+"-"+gm]||{};
+    gd.push({label:MONTHS[gm],inc:N(gdata._totalIncome,0),exp:N(gdata._totalExpenses,0),sav:N(gdata._totalSavings,0)});
+  }
+  var maxV=1; for(var gi2=0;gi2<gd.length;gi2++) if(gd[gi2].inc>maxV) maxV=gd[gi2].inc;
+  var barsWrap=h("div",{style:{display:"flex",gap:"6px",alignItems:"flex-end",minHeight:"100px",padding:"8px 0"}});
+  for(var bi=0;bi<gd.length;bi++){
+    var bd=gd[bi];
+    var col=h("div",{style:{flex:"1",display:"flex",flexDirection:"column",alignItems:"center",gap:"5px"}});
+    var bRow=h("div",{style:{display:"flex",gap:"2px",alignItems:"flex-end"}});
+    [{v:bd.inc,c:"#3182F6"},{v:bd.exp,c:"#F04452"},{v:bd.sav,c:"#1CD66B"}].forEach(function(b){bRow.appendChild(h("div",{style:{width:"8px",borderRadius:"3px 3px 0 0",background:b.c,height:Math.max(2,b.v/maxV*88)+"px"}}));});
+    col.appendChild(bRow); col.appendChild(h("div",{style:{fontSize:"11px",color:"#8B95A1",fontWeight:"500"}},bd.label));
+    barsWrap.appendChild(col);
+  }
+  var legend=h("div",{style:{display:"flex",gap:"14px",justifyContent:"center",marginTop:"10px"}});
+  [["#3182F6","수입"],["#F04452","지출"],["#1CD66B","적금"]].forEach(function(lg){legend.appendChild(h("div",{style:{display:"flex",alignItems:"center",gap:"5px",fontSize:"13px",color:"#6B7684",fontWeight:"500"}},h("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:lg[0]}}),lg[1]));});
+  var graphCard=h("div",{className:"t-card"},h("div",{style:{fontSize:"14px",fontWeight:"700",color:"#8B95A1",marginBottom:"12px"}},"최근 6개월"),barsWrap,legend);
+
+  function prevM(){var m=month-1,y=year;if(m<0){m=11;y--;}setS({year:y,month:m});}
+  function nextM(){var m=month+1,y=year;if(m>11){m=0;y++;}setS({year:y,month:m});}
+  var mpicker=s.monthPickerOpen?renderMonthPicker(year,month,function(y,m){setS({year:y,month:m,monthPickerOpen:false});},function(){setS({monthPickerOpen:false});}):"";
+
+  // Stats popup
+  var statsPopup="";
+  if(s.statsOpen){
+    var statsBody=h("div",{style:{padding:"0 20px 32px"}});
+    var cnts={"1m":2,"3m":3,"6m":6,"1y":12}; var cnt=cnts[s.statsPeriod]||3;
+    var srows=[];
+    for(var sri=0;sri<cnt;sri++){var sm=month-sri,sy=year;if(sm<0){sm+=12;sy--;}var sd=s.allData[sy+"-"+sm]||{};srows.unshift({label:sy+"년 "+MONTHS[sm],inc:N(sd._totalIncome,0),exp:N(sd._totalExpenses,0),sav:N(sd._totalSavings,0)});}
+    for(var si2=0;si2<srows.length;si2++){
+      var sr=srows[si2];
+      var sgrid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginTop:"8px"}});
+      [["수입",sr.inc,"#3182F6"],["지출",sr.exp,"#F04452"],["적금",sr.sav,"#1CD66B"]].forEach(function(si3){
+        sgrid.appendChild(h("div",{style:{background:"#F9FAFB",borderRadius:"10px",padding:"12px"}},h("div",{style:{fontSize:"12px",color:"#8B95A1",marginBottom:"4px"}},si3[0]),h("div",{style:{fontSize:"15px",fontWeight:"700",color:si3[2]}},fmt(si3[1])),sr.inc>0?h("div",{style:{fontSize:"11px",color:"#ADB5BD",marginTop:"2px"}},fmtPct(si3[1]/sr.inc*100)):""));
+      });
+      statsBody.appendChild(h("div",{style:{paddingBottom:"16px",marginBottom:"4px",borderBottom:"1px solid #F2F4F6"}},h("div",{style:{fontSize:"16px",fontWeight:"700",marginBottom:"4px",color:"#191F28"}},sr.label),sgrid));
+    }
+    var tabsRow=h("div",{style:{display:"flex",gap:"8px",padding:"16px 20px"}});
+    [["1m","지난달 비교"],["3m","3개월"],["6m","6개월"],["1y","1년"]].forEach(function(spTab){
+      (function(k,l){tabsRow.appendChild(h("button",{style:{flex:"1",padding:"9px",background:s.statsPeriod===k?"#EBF3FE":"#F2F4F6",border:"none",borderRadius:"8px",color:s.statsPeriod===k?"#3182F6":"#6B7684",fontSize:"14px",cursor:"pointer",fontWeight:s.statsPeriod===k?"700":"500"},onClick:function(){setS({statsPeriod:k});}},l));})(spTab[0],spTab[1]);
+    });
+    statsPopup=h("div",{style:{position:"fixed",inset:"0",background:"rgba(0,0,0,0.45)",zIndex:"300",display:"flex",alignItems:"flex-end",justifyContent:"center"}},h("div",{style:{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxWidth:"520px",maxHeight:"85vh",overflow:"auto"}},h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"20px 20px 0"}},h("span",{style:{fontSize:"18px",fontWeight:"700"}},"📊 기간별 통계"),h("button",{style:{background:"none",border:"none",fontSize:"24px",color:"#ADB5BD",cursor:"pointer"},onClick:function(){setS({statsOpen:false});}},"✕")),tabsRow,statsBody));
+  }
+
+  // Summary
+  var sumGrid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"20px"}});
+  [["💰 수입",c.totI,"#3182F6"],["💸 지출",c.totE,"#F04452"],["📈 적금",c.totS,"#1CD66B"]].forEach(function(si4){
+    sumGrid.appendChild(h("div",{style:{background:"#F9FAFB",borderRadius:"12px",padding:"12px 10px"}},h("div",{style:{fontSize:"12px",color:"#8B95A1",marginBottom:"5px",fontWeight:"500"}},si4[0]),h("div",{style:{fontSize:"14px",fontWeight:"800",color:si4[2],wordBreak:"keep-all"}},fmt(si4[1])),c.totI>0?h("div",{style:{fontSize:"11px",color:"#ADB5BD",marginTop:"3px"}},fmtPct(si4[1]/c.totI*100)):""));
+  });
+
+  function detailRow(label,val,col){return h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #F2F4F6"}},h("span",{style:{fontSize:"15px",color:"#6B7684"}}),h("span",{style:{fontSize:"15px",fontWeight:"600",color:col||"#191F28"}},val));}
+
+  // Wife details
+  var ws=s.settings.wife.savings||[]; var we=s.settings.wife.expenses||[];
+  var wifeDtl=h("div",null);
+  function addSub(label,col){var el=h("div",{style:{fontSize:"13px",fontWeight:"700",color:"#8B95A1",marginBottom:"4px",marginTop:"12px"}});el.textContent=label;wifeDtl.appendChild(el);}
+  function addRow(lbl,val,col){var el=detailRow(lbl,val,col);el.children[0].textContent=lbl;wifeDtl.appendChild(el);}
+  addSub("수입"); addRow("월급",fmt(c.wS));
+  addSub("적금"); addRow("적금 합계",fmt(c.wTS),"#1CD66B");
+  ws.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRow(" ↳ "+it.label,fmt(a));});
+  addRow(" ↳ 납부원금 (주담대)",fmt(c.lP)); addRow(" ↳ 비비상금",fmt(c.wBB));
+  addSub("지출"); addRow("지출 합계",fmt(c.wTE),"#F04452");
+  we.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRow(" ↳ "+it.label,fmt(a));});
+  addRow(" ↳ 대출이자 (주담대)",fmt(c.lI)); addRow("대출잔금",fmt(c.lB),"#F04452");
+
+  // Husband details
+  var hs=s.settings.husband.savings||[]; var he=s.settings.husband.expenses||[]; var ex=s.settings.husband.income_extra||[];
+  var husDtl=h("div",null);
+  function addSubH(label){var el=h("div",{style:{fontSize:"13px",fontWeight:"700",color:"#8B95A1",marginBottom:"4px",marginTop:"12px"}});el.textContent=label;husDtl.appendChild(el);}
+  function addRowH(lbl,val,col){var el=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #F2F4F6"}},h("span",{style:{fontSize:"15px",color:"#6B7684"}},lbl),h("span",{style:{fontSize:"15px",fontWeight:"600",color:col||"#191F28"}},val));husDtl.appendChild(el);}
+  addSubH("수입"); addRowH("월급",fmt(c.husbandSalary));
+  if(c.t1) addRowH(" ↳ "+(ex[0]||{label:"떡값1"}).label,fmt(c.t1a));
+  if(c.t2) addRowH(" ↳ "+(ex[1]||{label:"떡값2"}).label,fmt(c.t2a));
+  if(c.t1||c.t2) addRowH("합산 수입",fmt(c.hT));
+  addSubH("적금"); addRowH("적금 합계",fmt(c.hTS),"#1CD66B");
+  hs.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRowH(" ↳ "+it.label,fmt(a));});
+  addRowH(" ↳ 비비상금",fmt(c.hBB));
+  addSubH("지출"); addRowH("지출 합계",fmt(c.hTE),"#F04452");
+  he.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRowH(" ↳ "+it.label,fmt(a));});
+
+  var mainCard=h("div",{className:"t-card"},
+    h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"16px",gap:"8px",flexWrap:"nowrap"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:"4px"}},
+        h("button",{className:"t-arrow",onClick:prevM},"‹"),
+        h("button",{style:{background:"none",border:"none",color:"#191F28",fontSize:"16px",fontWeight:"700",cursor:"pointer",padding:"4px 6px",whiteSpace:"nowrap"},onClick:function(){setS({monthPickerOpen:!s.monthPickerOpen});}},year+"년 "+MONTHS[month]),
+        h("button",{className:"t-arrow",onClick:nextM},"›")
+      ),
+      h("div",{style:{display:"flex",gap:"8px"}},
+        h("button",{style:{padding:"6px 10px",background:"#F2F4F6",border:"none",borderRadius:"8px",color:"#4E5968",fontSize:"12px",cursor:"pointer",fontWeight:"600",whiteSpace:"nowrap"},onClick:function(){setS({menu:"ledger"});}},"수정하기"),
+        h("button",{style:{padding:"6px 10px",background:"#EBF3FE",border:"none",borderRadius:"8px",color:"#3182F6",fontSize:"12px",cursor:"pointer",fontWeight:"600",whiteSpace:"nowrap"},onClick:function(){setS({statsOpen:true});}},"통계")
+      )
+    ),
+    mpicker, sumGrid,
+    h("div",{style:{borderTop:"1px solid #F2F4F6",paddingTop:"16px",marginTop:"4px"}},h("div",{style:{fontSize:"17px",fontWeight:"800",marginBottom:"8px"}},"👩 아내"),wifeDtl),
+    h("div",{style:{borderTop:"1px solid #F2F4F6",paddingTop:"16px",marginTop:"16px"}},h("div",{style:{fontSize:"17px",fontWeight:"800",marginBottom:"8px"}},"👨 남편"),husDtl)
+  );
+
+  var wrap=h("div",{style:{display:"flex",flexDirection:"column",gap:"10px"},className:"fade-in"});
+  wrap.appendChild(graphCard); if(statsPopup) wrap.appendChild(statsPopup); wrap.appendChild(mainCard);
+  return wrap;
+}
+
+/* ── LEDGER */
+function renderLedger(c){
+  var s=STATE;
+  var year=s.year;
+  var month=s.month;
+
+  var wrap=h("div",{style:{padding:"16px"}});
+
+  // 월 네비
+  var nav=h("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",marginBottom:"16px"}});
+  var prevBtn=h("button",{style:{width:"36px",height:"36px",background:"#F2F4F6",border:"none",borderRadius:"8px",fontSize:"20px",cursor:"pointer"}},"‹");
+  prevBtn.addEventListener("click",function(){
+    var m=month-1,y=year;
+    if(m<0){m=11;y--;}
+    setS({year:y,month:m});
+  });
+  var nextBtn=h("button",{style:{width:"36px",height:"36px",background:"#F2F4F6",border:"none",borderRadius:"8px",fontSize:"20px",cursor:"pointer"}},"›");
+  nextBtn.addEventListener("click",function(){
+    var m=month+1,y=year;
+    if(m>11){m=0;y++;}
+    setS({year:y,month:m});
+  });
+  var mLabel=h("span",{style:{fontSize:"18px",fontWeight:"700",color:"#191F28"}},year+"년 "+MONTHS[month]);
+  nav.appendChild(prevBtn);
+  nav.appendChild(mLabel);
+  nav.appendChild(nextBtn);
+  wrap.appendChild(nav);
+
+  // setMD 함수
+  function setMD(patch){
+    var mKey=c.mKey;
+    var cur=s.allData[mKey]||{};
+    var nm={};
+    var k;
+    for(k in cur) nm[k]=cur[k];
+    for(k in patch) nm[k]=patch[k];
+    var newAll={};
+    for(k in s.allData) newAll[k]=s.allData[k];
+    newAll[mKey]=nm;
+    setS({allData:newAll});
+  }
+
+  // 수입 입력 헬퍼
+  function salaryInput(label,fieldKey,currentVal){
+    var box=h("div",{style:{marginBottom:"16px"}});
+    box.appendChild(h("div",{style:{fontSize:"14px",color:"#6B7684",fontWeight:"600",marginBottom:"6px"}},label));
+    var salWrap=h("div",{style:{position:"relative"}});
+    var inp=h("input",{type:"number",style:{
+      width:"100%",boxSizing:"border-box",
+      background:"#F2F4F6",border:"1.5px solid #E5E8EB",
+      borderRadius:"10px",color:"#191F28",
+      fontSize:"18px",fontWeight:"700",
+      padding:"12px 40px 12px 14px",outline:"none"
+    },placeholder:"0"});
+    inp.value=currentVal||"";
+    (function(fk){
+      inp.addEventListener("change",function(e){
+        var p={};
+        p[fk]=e.target.value;
+        setMD(p);
+      });
+    })(fieldKey);
+    salWrap.appendChild(inp);
+    salWrap.appendChild(h("span",{style:{
+      position:"absolute",right:"14px",top:"50%",
+      transform:"translateY(-50%)",
+      fontSize:"15px",color:"#8B95A1",pointerEvents:"none"
+    }},"원"));
+    box.appendChild(salWrap);
+    return box;
+  }
+
+  // 항목 입력 헬퍼
+  function itemInput(label,emoji,defVal,storeKey,highlight){
+    var cur=c.md[storeKey]!==undefined ? N(c.md[storeKey],defVal) : defVal;
+    var diff=cur-defVal;
+
+    var box=h("div",{style:{
+      background:highlight?"#EBF3FE":"#F9FAFB",
+      borderRadius:"12px",
+      padding:"14px 16px",
+      marginBottom:"8px",
+      borderLeft:highlight?"3px solid #3182F6":"none"
+    }});
+
+    var nameRow=h("div",{style:{display:"flex",alignItems:"center",gap:"6px",marginBottom:"6px"}});
+    nameRow.appendChild(h("span",{style:{fontSize:"16px"}},emoji));
+    nameRow.appendChild(h("span",{style:{fontSize:"15px",fontWeight:"600",color:"#191F28"}},label));
+    box.appendChild(nameRow);
+
+    if(Math.abs(diff)>0){
+      var diffEl=h("div",{style:{fontSize:"12px",color:diff>0?"#F04452":"#1CD66B",fontWeight:"700",marginBottom:"6px"}},
+        sign(diff)+fmt(diff)
+      );
+      box.appendChild(diffEl);
+    }
+
+    var inpWrap=h("div",{style:{position:"relative"}});
+    var inp=h("input",{type:"number",style:{
+      width:"100%",boxSizing:"border-box",
+      background:"#fff",border:"1.5px solid #E5E8EB",
+      borderRadius:"10px",color:"#191F28",
+      fontSize:"17px",fontWeight:"700",
+      padding:"12px 40px 12px 14px",outline:"none"
+    },placeholder:"0"});
+    inp.value=cur;
+    (function(sk){
+      inp.addEventListener("change",function(e){
+        var p={};
+        p[sk]=e.target.value;
+        setMD(p);
+      });
+    })(storeKey);
+    inpWrap.appendChild(inp);
+    inpWrap.appendChild(h("span",{style:{
+      position:"absolute",right:"14px",top:"50%",
+      transform:"translateY(-50%)",
+      fontSize:"15px",color:"#8B95A1",pointerEvents:"none"
+    }},"원"));
+    box.appendChild(inpWrap);
+    return box;
+  }
+
+  // 섹션 헤더
+  function secHdr(icon,title,total,income,col){
+    var d=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0 10px",borderBottom:"2px solid #E5E8EB",marginBottom:"12px",marginTop:"4px"}});
+    var left=h("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
+    left.appendChild(h("span",{style:{fontSize:"18px"}},icon));
+    left.appendChild(h("span",{style:{fontSize:"17px",fontWeight:"800",color:"#191F28"}},title));
+    d.appendChild(left);
+    var right=h("div",{style:{textAlign:"right"}});
+    right.appendChild(h("div",{style:{fontSize:"16px",fontWeight:"700",color:col}},fmt(total)));
+    if(income>0) right.appendChild(h("div",{style:{fontSize:"12px",color:"#ADB5BD"}},fmtPct(total/income*100)));
+    d.appendChild(right);
+    return d;
+  }
+
+  // ── 아내 섹션
+  var wCard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",marginBottom:"10px",boxShadow:"0 1px 6px rgba(0,0,0,0.06)",overflow:"hidden"}});
+  wCard.appendChild(h("div",{style:{fontSize:"20px",fontWeight:"800",color:"#191F28",marginBottom:"18px"}},"👩 아내"));
+  wCard.appendChild(secHdr("💰","수입",c.wS,0,"#3182F6"));
+  wCard.appendChild(salaryInput("월급","wifeSalary",c.md.wifeSalary));
+
+  var ws=s.settings.wife.savings||[];
+  var we=s.settings.wife.expenses||[];
+  var i;
+
+  wCard.appendChild(secHdr("📈","적금",c.wTS,c.wT,"#1CD66B"));
+  for(i=0;i<ws.length;i++){
+    wCard.appendChild(itemInput(ws[i].label,ws[i].emoji,ws[i].amount,ws[i].id+"_amt",false));
+  }
+  wCard.appendChild(itemInput("납부원금 (주담대)","🏦",c.lP,"납부원금_amt",false));
+  wCard.appendChild(itemInput("비비상금","🔒",c.wBBa,"비비상금_나_amt",true));
+
+  wCard.appendChild(secHdr("💸","지출",c.wTE,c.wT,"#F04452"));
+  for(i=0;i<we.length;i++){
+    wCard.appendChild(itemInput(we[i].label,we[i].emoji,we[i].amount,we[i].id+"_amt",false));
+  }
+  wCard.appendChild(itemInput("대출이자 (주담대)","🏦",c.lI,"대출이자_amt",false));
+
+  // 대출 정보
+  var lbox=h("div",{style:{background:"#F9FAFB",borderRadius:"12px",padding:"14px",marginTop:"8px"}});
+  lbox.appendChild(h("div",{style:{fontSize:"14px",fontWeight:"700",color:"#4E5968",marginBottom:"10px"}},"🏠 주택담보대출"));
+  var ldata=[["월 상환금",fmt(LOAN_BASE.monthlyPayment)],["납부원금",fmt(c.lP)],["대출이자",fmt(c.lI)],["대출잔금",fmt(c.lB)],["금리",(c.lCfg?c.lCfg.rate:LOAN_BASE.rate)+"%"]];
+  for(i=0;i<ldata.length;i++){
+    var lr=h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"14px",padding:"5px 0",borderBottom:"1px solid #F2F4F6"}});
+    lr.appendChild(h("span",{style:{color:"#8B95A1"}},ldata[i][0]));
+    lr.appendChild(h("span",{style:{fontWeight:"600",color:i===3?"#F04452":"#191F28"}},ldata[i][1]));
+    lbox.appendChild(lr);
+  }
+  wCard.appendChild(lbox);
+  wrap.appendChild(wCard);
+
+  // ── 남편 섹션
+  var hCard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",marginBottom:"10px",boxShadow:"0 1px 6px rgba(0,0,0,0.06)",overflow:"hidden"}});
+  hCard.appendChild(h("div",{style:{fontSize:"20px",fontWeight:"800",color:"#191F28",marginBottom:"18px"}},"👨 남편"));
+  hCard.appendChild(secHdr("💰","수입",c.hT,0,"#3182F6"));
+  hCard.appendChild(salaryInput("월급","husbandSalary",c.md.husbandSalary));
+
+  // 떡값 토글
+  var ex=s.settings.husband.income_extra||[];
+  for(i=0;i<ex.length;i++){
+    (function(item,idx){
+      var ak=idx===0?"tteok1Active":"tteok2Active";
+      var amk=idx===0?"tteok1Amt":"tteok2Amt";
+      var active=c.md[ak]||false;
+      var togBtn=h("button",{style:{
+        width:"100%",padding:"13px 16px",borderRadius:"12px",
+        border:"1.5px solid "+(active?"#3182F6":"#E5E8EB"),
+        background:active?"#EBF3FE":"#F9FAFB",
+        color:active?"#3182F6":"#4E5968",
+        fontSize:"15px",fontWeight:"600",textAlign:"left",
+        cursor:"pointer",marginBottom:"8px",
+        display:"flex",justifyContent:"space-between"
+      }});
+      var tLeft=h("span",null,item.emoji+" "+item.label);
+      var tRight=h("span",{style:{fontSize:"13px",fontWeight:"700"}},active?"ON ✓":"OFF");
+      togBtn.appendChild(tLeft);
+      togBtn.appendChild(tRight);
+      if(item.info){
+        var infoEl=h("div",{style:{fontSize:"12px",color:"#8B95A1",marginTop:"2px",marginBottom:"4px"}},item.info);
+        hCard.appendChild(infoEl);
+      }
+      (function(ak2,amk2,amt){
+        togBtn.addEventListener("click",function(){
+          var p={};
+          p[ak2]=!active;
+          setMD(p);
+        });
+        if(active){
+          var aInp=h("input",{type:"number",style:{flex:"1",background:"#F2F4F6",border:"1.5px solid #E5E8EB",borderRadius:"10px",color:"#191F28",fontSize:"17px",fontWeight:"700",padding:"12px 14px",outline:"none"},placeholder:"0"});
+          aInp.value=c.md[amk2]!==undefined?c.md[amk2]:amt;
+          aInp.addEventListener("change",function(e){
+            var p={};
+            p[amk2]=e.target.value;
+            setMD(p);
+          });
+          var aRow=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}});
+          aRow.appendChild(aInp);
+          aRow.appendChild(h("span",{style:{fontSize:"15px",color:"#8B95A1"}},"원"));
+          hCard.appendChild(togBtn);
+          hCard.appendChild(aRow);
+          return;
+        }
+      })(ak,amk,item.amount);
+      hCard.appendChild(togBtn);
+    })(ex[i],i);
+  }
+
+  var hs=s.settings.husband.savings||[];
+  var he=s.settings.husband.expenses||[];
+
+  hCard.appendChild(secHdr("📈","적금",c.hTS,c.hT,"#1CD66B"));
+  for(i=0;i<hs.length;i++){
+    hCard.appendChild(itemInput(hs[i].label,hs[i].emoji,hs[i].amount,hs[i].id+"_amt",false));
+  }
+  hCard.appendChild(itemInput("비비상금","🔒",c.hBBa,"비비상금_남_amt",true));
+
+  hCard.appendChild(secHdr("💸","지출",c.hTE,c.hT,"#F04452"));
+  for(i=0;i<he.length;i++){
+    var hAmt=i===2?c.evA:he[i].amount;
+    var hInfo=i===2?(c.evE?c.evE.detail:"경조사비"):he[i].info||null;
+    hCard.appendChild(itemInput(he[i].label,he[i].emoji,hAmt,he[i].id+"_amt",false));
+  }
+  wrap.appendChild(hCard);
+
+  // ── 합산 카드
+  var totCard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",marginBottom:"10px",boxShadow:"0 1px 6px rgba(0,0,0,0.06)",overflow:"hidden"}});
+  totCard.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:"#191F28",marginBottom:"16px"}},"📊 이번달 합산"));
+
+  var totData=[["💰 합산 수입",c.totI,"#3182F6"],["💸 합산 지출",c.totE,"#F04452"],["📈 합산 적금",c.totS,"#1CD66B"]];
+  for(i=0;i<totData.length;i++){
+    var td=totData[i];
+    var trow=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F2F4F6"}});
+    trow.appendChild(h("span",{style:{fontSize:"16px",color:"#4E5968",fontWeight:"500"}},td[0]));
+    var pct=c.totI>0?" ("+fmtPct(td[1]/c.totI*100)+")":"";
+    trow.appendChild(h("span",{style:{fontSize:"16px",fontWeight:"700",color:td[2]}},fmt(td[1])+pct));
+    totCard.appendChild(trow);
+  }
+
+  // 수입 대비
+  var wDiff=c.wT-c.wGO;
+  var hDiff=c.hT-c.hGO;
+  var diffGrid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginTop:"16px"}});
+
+  var wBox=h("div",{style:{background:wDiff>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
+  wBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"6px"}},"👩 아내 수입 대비"));
+  wBox.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:wDiff>=0?"#0F9648":"#F04452"}},sign(wDiff)+fmt(wDiff)));
+  if(c.wT>0) wBox.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1"}},sign(wDiff/c.wT*100)+fmtPct(Math.abs(wDiff/c.wT*100))));
+
+  var hBox=h("div",{style:{background:hDiff>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
+  hBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"6px"}},"👨 남편 수입 대비"));
+  hBox.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:hDiff>=0?"#0F9648":"#F04452"}},sign(hDiff)+fmt(hDiff)));
+  if(c.hT>0) hBox.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1"}},sign(hDiff/c.hT*100)+fmtPct(Math.abs(hDiff/c.hT*100))));
+
+  diffGrid.appendChild(wBox);
+  diffGrid.appendChild(hBox);
+  totCard.appendChild(diffGrid);
+  wrap.appendChild(totCard);
+
+  // 저장 버튼
+  var btnBg=s.syncStatus==="saved"?"#0F9648":s.syncStatus==="saving"?"#ADB5BD":s.syncStatus==="error"?"#F04452":"#3182F6";
+  var btnLabel=s.syncStatus==="saved"?"✅ 저장됐어요!":s.syncStatus==="saving"?"⏳ 저장 중...":s.syncStatus==="error"?"❌ 오류 발생":"💾 저장하기";
+  var saveBtn=h("button",{style:{display:"block",width:"100%",padding:"17px",border:"none",borderRadius:"14px",fontSize:"17px",fontWeight:"700",cursor:"pointer",color:"#fff",background:btnBg,marginBottom:"20px"}},btnLabel);
+  saveBtn.addEventListener("click",function(){
+    var snap={};
+    var k;
+    for(k in c.md) snap[k]=c.md[k];
+    snap._totalExpenses=c.totE;
+    snap._totalSavings=c.totS;
+    snap._totalIncome=c.totI;
+    setS({syncStatus:"saving"});
+    var payload={};
+    payload[c.mKey]=snap;
+    fbSet("allData",payload).then(function(ok){
+      setS({syncStatus:ok?"saved":"error"});
+      setTimeout(function(){setS({syncStatus:"idle"});},2500);
+    });
+  });
+  wrap.appendChild(saveBtn);
+
+  return wrap;
+}
+
+/* ── SETTINGS */
+function renderSettings(c){
+  var s=STATE;
+
+  // Tab bar
+  var tabBar=h("div",{style:{display:"flex",gap:"8px",marginBottom:"12px"}});
+  [["main","설정 메인"],["history","수정 내용"],["security","🔐 보안"]].forEach(function(tab){
+    (function(k,l){
+      var btn=h("button",{style:{
+        flex:"1",padding:"11px 6px",
+        background:s.settingsTab===k?"#EBF3FE":"#fff",
+        border:s.settingsTab===k?"1.5px solid #3182F6":"1.5px solid #E5E8EB",
+        borderRadius:"12px",color:s.settingsTab===k?"#3182F6":"#6B7684",
+        fontSize:"14px",cursor:"pointer",fontWeight:s.settingsTab===k?"700":"500"
+      }},l);
+      btn.addEventListener("click",function(){setS({settingsTab:k});});
+      tabBar.appendChild(btn);
+    })(tab[0],tab[1]);
+  });
+
+  var wrap=h("div",{style:{display:"flex",flexDirection:"column",gap:"10px"}});
+  wrap.appendChild(tabBar);
+
+  // ── History tab
+  if(s.settingsTab==="history"){
+    var hist=s.settingsHistory||[];
+    var hcard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}});
+    hcard.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:"#191F28",marginBottom:"16px"}},"📋 항목별 수정 내용"));
+    if(hist.length===0){
+      hcard.appendChild(h("div",{style:{color:"#ADB5BD",textAlign:"center",padding:"36px 0",fontSize:"15px"}},"수정 히스토리가 없어요"));
+    } else {
+      var i;
+      for(i=0;i<hist.length;i++){
+        var hh=hist[i];
+        var hrow=h("div",{style:{padding:"14px 0",borderBottom:"1px solid #F2F4F6"}});
+        hrow.appendChild(h("div",{style:{fontSize:"15px",fontWeight:"700",color:"#191F28",marginBottom:"3px"}},hh.item));
+        hrow.appendChild(h("div",{style:{fontSize:"12px",color:"#ADB5BD",marginBottom:"5px"}},hh.date));
+        var chgText = hh.note ? hh.note : (fmt(hh.from)+" → "+fmt(hh.to));
+        var chg=h("div",{style:{fontSize:"14px",color:"#6B7684"}},chgText);
+        if(!hh.note && hh.diff!=null){
+          var diffSpan=h("span",{style:{color:hh.diff>0?"#F04452":"#1CD66B",fontWeight:"700"}}," ("+sign(hh.diff)+fmt(hh.diff)+")");
+          chg.appendChild(diffSpan);
+        }
+        hrow.appendChild(chg);
+        hcard.appendChild(hrow);
+      }
+    }
+    wrap.appendChild(hcard);
+    return wrap;
+  }
+
+  // ── Security tab
+  if(s.settingsTab==="security"){
+    wrap.appendChild(renderSecurity());
+    return wrap;
+  }
+
+  // ── Main settings tab
+  var local=JSON.parse(JSON.stringify(s.settings));
+  var msgEl=h("div",{style:{fontSize:"14px",fontWeight:"600",minHeight:"20px",padding:"4px 0",textAlign:"center"}});
+
+  // Item group builder - same style as ledger
+  function buildGroup(person,cat,icon,groupTitle){
+    var items=local[person][cat]||[];
+    var gWrap=h("div",{style:{marginBottom:"4px"}});
+
+    // Section header like ledger
+    var hdr=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"14px 0 10px",borderBottom:"2px solid #E5E8EB",marginBottom:"12px"}});
+    hdr.appendChild(h("span",{style:{fontSize:"18px"}},icon));
+    hdr.appendChild(h("span",{style:{fontSize:"17px",fontWeight:"800",color:"#191F28"}},groupTitle));
+    gWrap.appendChild(hdr);
+
+    function rebuild(){
+      // Remove all children after header
+      while(gWrap.children.length>1) gWrap.removeChild(gWrap.lastChild);
+      var i;
+      for(i=0;i<items.length;i++){
+        (function(item,idx){
+          var itemBox=h("div",{style:{background:"#F9FAFB",borderRadius:"12px",padding:"14px 16px",marginBottom:"8px",overflow:"hidden"}});
+
+          // Top row: emoji + name + delete button
+          var topRow=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"10px"}});
+
+          var eInp=h("input",{type:"text",style:{
+            width:"44px",flexShrink:"0",background:"#fff",border:"1.5px solid #E5E8EB",
+            borderRadius:"8px",color:"#191F28",fontSize:"18px",padding:"6px 4px",
+            outline:"none",textAlign:"center"
+          }});
+          eInp.value=item.emoji||"💰";
+          eInp.addEventListener("change",function(e){item.emoji=e.target.value;});
+
+          var nInp=h("input",{type:"text",style:{
+            flex:"1",minWidth:"0",background:"#fff",border:"1.5px solid #E5E8EB",
+            borderRadius:"8px",color:"#191F28",fontSize:"15px",padding:"9px 12px",outline:"none"
+          }});
+          nInp.value=item.label;
+          nInp.addEventListener("change",function(e){item.label=e.target.value;});
+
+          var delBtn=h("button",{style:{
+            flexShrink:"0",width:"36px",height:"36px",background:"#FEF0F1",
+            border:"none",borderRadius:"8px",color:"#F04452",fontSize:"16px",cursor:"pointer"
+          }},"✕");
+          (function(ii){
+            delBtn.addEventListener("click",function(){items.splice(ii,1);rebuild();});
+          })(idx);
+
+          topRow.appendChild(eInp);
+          topRow.appendChild(nInp);
+          topRow.appendChild(delBtn);
+          itemBox.appendChild(topRow);
+
+          // Amount row
+          var amtRow=h("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
+          amtRow.appendChild(h("span",{style:{fontSize:"13px",color:"#8B95A1",fontWeight:"500",whiteSpace:"nowrap"}},"금액"));
+          var aInp=h("input",{type:"number",style:{
+            flex:"1",minWidth:"0",width:"1px",background:"#fff",border:"1.5px solid #E5E8EB",
+            borderRadius:"8px",color:"#191F28",fontSize:"16px",fontWeight:"700",
+            padding:"10px 12px",outline:"none"
+          }});
+          aInp.value=item.amount;
+          aInp.addEventListener("change",function(e){item.amount=N(e.target.value,0);});
+          amtRow.appendChild(aInp);
+          amtRow.appendChild(h("span",{style:{fontSize:"13px",color:"#8B95A1",flexShrink:"0"}},"원"));
+          itemBox.appendChild(amtRow);
+
+          gWrap.appendChild(itemBox);
+        })(items[i],i);
+      }
+
+      // Add button
+      var addBtn=h("button",{style:{
+        width:"100%",padding:"13px",background:"#fff",
+        border:"1.5px dashed #D1D6DB",borderRadius:"12px",
+        color:"#8B95A1",fontSize:"14px",cursor:"pointer",fontWeight:"500"
+      }},"＋ 항목 추가");
+      addBtn.addEventListener("click",function(){
+        items.push({id:"custom_"+Date.now(),label:"새 항목",emoji:"💰",amount:0});
+        rebuild();
+      });
+      gWrap.appendChild(addBtn);
+    }
+    rebuild();
+    return gWrap;
+  }
+
+  // Loan settings card
+  var lLocal=JSON.parse(JSON.stringify(local.loan||LOAN_BASE));
+
+  function loanField(label,key,unit){
+    var box=h("div",{style:{marginBottom:"14px"}});
+    box.appendChild(h("div",{style:{fontSize:"13px",color:"#8B95A1",fontWeight:"600",marginBottom:"6px"}},label));
+    var row=h("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
+    var el=h("input",{type:"number",step:"any",style:{
+      flex:"1",minWidth:"0",width:"1px",background:"#F9FAFB",border:"1.5px solid #E5E8EB",
+      borderRadius:"10px",color:"#191F28",fontSize:"16px",fontWeight:"700",
+      padding:"12px 14px",outline:"none"
+    }});
+    el.value=lLocal[key]!==undefined?lLocal[key]:"";
+    el.addEventListener("change",function(e){lLocal[key]=N(e.target.value,lLocal[key]);});
+    row.appendChild(el);
+    if(unit) row.appendChild(h("span",{style:{fontSize:"14px",color:"#8B95A1",flexShrink:"0"}},unit));
+    box.appendChild(row);
+    return box;
+  }
+
+  var atBox=h("div",{style:{marginBottom:"14px"}});
+  atBox.appendChild(h("div",{style:{fontSize:"13px",color:"#8B95A1",fontWeight:"600",marginBottom:"6px"}},"자동이체 종료"));
+  var atEl=h("input",{type:"text",style:{
+    width:"100%",background:"#F9FAFB",border:"1.5px solid #E5E8EB",
+    borderRadius:"10px",color:"#191F28",fontSize:"16px",fontWeight:"700",
+    padding:"12px 14px",outline:"none",boxSizing:"border-box"
+  },placeholder:"예: 2027.09"});
+  atEl.value=lLocal.autoTransferUntil||"";
+  atEl.addEventListener("change",function(e){lLocal.autoTransferUntil=e.target.value;});
+  atBox.appendChild(atEl);
+
+  var loanCard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",overflow:"hidden"}});
+  var lHdr=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"0 0 12px",borderBottom:"2px solid #E5E8EB",marginBottom:"16px"}});
+  lHdr.appendChild(h("span",{style:{fontSize:"18px"}},"🏠"));
+  lHdr.appendChild(h("span",{style:{fontSize:"17px",fontWeight:"800",color:"#191F28"}},"주택담보대출 설정"));
+  loanCard.appendChild(lHdr);
+  loanCard.appendChild(loanField("대출 금리 (%)","rate","%"));
+  loanCard.appendChild(loanField("현재 대출잔금","baseBalance","원"));
+  loanCard.appendChild(atBox);
+  loanCard.appendChild(h("div",{style:{
+    fontSize:"13px",color:"#8B95A1",lineHeight:"1.7",
+    background:"#F9FAFB",borderRadius:"10px",padding:"12px"
+  }},"이번달: 납부원금 "+fmt(c.lP)+" / 이자 "+fmt(c.lI)+" / 잔금 "+fmt(c.lB)));
+
+  // Save button
+  var saveBtn=h("button",{style:{
+    display:"block",width:"100%",padding:"16px",
+    background:"#0F9648",border:"none",borderRadius:"14px",
+    color:"#fff",fontSize:"17px",fontWeight:"700",cursor:"pointer"
+  }},"✅ 설정 최종 반영");
+  saveBtn.addEventListener("click",function(){
+    var old=s.settings;
+    var changes=[];
+    var p,cat,ni,oi,i2,nit,oit,k2;
+    var persons=["wife","husband"];
+    var cats=["savings","expenses"];
+    for(var pi=0;pi<persons.length;pi++){
+      p=persons[pi];
+      for(var ci=0;ci<cats.length;ci++){
+        cat=cats[ci];
+        ni=(local[p]&&local[p][cat])||[];
+        oi=(old[p]&&old[p][cat])||[];
+        for(i2=0;i2<ni.length;i2++){
+          nit=ni[i2];
+          oit=null;
+          for(var oi2=0;oi2<oi.length;oi2++){
+            if(oi[oi2].id===nit.id){oit=oi[oi2];break;}
+          }
+          if(oit&&oit.amount!==nit.amount){
+            changes.push({id:Date.now()+Math.random(),item:(p==="wife"?"아내":"남편")+" - "+nit.label,date:new Date().toLocaleString("ko-KR"),from:oit.amount,to:nit.amount,diff:nit.amount-oit.amount});
+          }
+        }
+      }
+    }
+    var newLoan={};
+    for(k2 in lLocal) newLoan[k2]=lLocal[k2];
+
+    // Track loan changes
+    var oldLoan=s.settings.loan||LOAN_BASE;
+    if(Number(lLocal.rate)!==Number(oldLoan.rate)){
+      changes.push({id:Date.now()+Math.random(),item:"대출 금리",date:new Date().toLocaleString("ko-KR"),from:Number(oldLoan.rate),to:Number(lLocal.rate),diff:Number(lLocal.rate)-Number(oldLoan.rate)});
+    }
+    if(Number(lLocal.baseBalance)!==Number(oldLoan.baseBalance)){
+      changes.push({id:Date.now()+Math.random(),item:"대출 잔금",date:new Date().toLocaleString("ko-KR"),from:Number(oldLoan.baseBalance),to:Number(lLocal.baseBalance),diff:Number(lLocal.baseBalance)-Number(oldLoan.baseBalance)});
+    }
+    if(lLocal.autoTransferUntil!==oldLoan.autoTransferUntil){
+      changes.push({id:Date.now()+Math.random(),item:"자동이체 종료",date:new Date().toLocaleString("ko-KR"),from:0,to:0,diff:null,note:oldLoan.autoTransferUntil+" → "+lLocal.autoTransferUntil});
+    }
+
+    local.loan=newLoan;
+    var newHist;
+    if(changes.length>0){
+      newHist=changes.concat(s.settingsHistory||[]);
+      if(newHist.length>100) newHist=newHist.slice(0,100);
+    } else {
+      newHist=s.settingsHistory||[];
+    }
+    setS({settings:local,settingsHistory:newHist});
+    fbSet("settings",local);
+    if(changes.length>0) fbSet("settingsHistory",{list:newHist});
+
+    // ── FIX 2: 반영 완료 알림 - 눈에 잘 보이는 토스트
+    var toast=document.createElement("div");
+    toast.textContent="✅ 설정이 반영됐어요!";
+    toast.style.cssText="position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#191F28;color:#fff;padding:14px 24px;border-radius:50px;font-size:15px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,0.25);animation:fadeIn 0.2s ease;";
+    document.body.appendChild(toast);
+    setTimeout(function(){
+      toast.style.opacity="0";
+      toast.style.transition="opacity 0.3s";
+      setTimeout(function(){if(toast.parentNode)toast.parentNode.removeChild(toast);},300);
+    },2500);
+  });
+
+  // Wife card
+  var wifeCard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",overflow:"hidden"}});
+  wifeCard.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:"#191F28",marginBottom:"16px"}},"👩 아내 - 항목 설정"));
+  wifeCard.appendChild(buildGroup("wife","savings","📈","적금"));
+  wifeCard.appendChild(buildGroup("wife","expenses","💸","지출"));
+
+  // Husband card
+  var husCard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",overflow:"hidden"}});
+  husCard.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:"#191F28",marginBottom:"16px"}},"👨 남편 - 항목 설정"));
+  husCard.appendChild(buildGroup("husband","income_extra","💰","기본 수입 (떡값)"));
+  husCard.appendChild(buildGroup("husband","savings","📈","적금"));
+  husCard.appendChild(buildGroup("husband","expenses","💸","지출"));
+
+  wrap.appendChild(wifeCard);
+  wrap.appendChild(husCard);
+  wrap.appendChild(loanCard);
+  wrap.appendChild(msgEl);
+  wrap.appendChild(saveBtn);
+  return wrap;
+}
+
+function renderSecurity(){
+  var curP="",newP="",conP="",selQ=(loadLS("hh_secret_q",{question:SECRET_QS[0],answer:""})).question,ans="";
+  var pMsg=h("div",{style:{fontSize:"13px",fontWeight:"600",minHeight:"18px"}});
+  var sMsg=h("div",{style:{fontSize:"13px",fontWeight:"600",minHeight:"18px"}});
+  var esq=loadLS("hh_secret_q",null);
+  function pi(ph,cb){var e=document.createElement("input");e.type="password";e.setAttribute("inputMode","numeric");e.maxLength=4;e.placeholder=ph;e.style.cssText="width:100%;background:#F2F4F6;border:1.5px solid #F2F4F6;border-radius:12px;color:#191F28;font-size:22px;padding:14px;outline:none;letter-spacing:8px;box-sizing:border-box;";e.addEventListener("input",function(ev){ev.target.value=ev.target.value.replace(/\D/g,"").slice(0,4);cb(ev.target.value);});return e;}
+  var selEl=document.createElement("select");selEl.style.cssText="width:100%;background:#F2F4F6;border:none;border-radius:12px;color:#191F28;font-size:14px;padding:13px 12px;outline:none;box-sizing:border-box;";
+  SECRET_QS.forEach(function(q){var o=document.createElement("option");o.value=q;o.textContent=q;if(q===selQ)o.selected=true;selEl.appendChild(o);});
+  selEl.addEventListener("change",function(e){selQ=e.target.value;});
+  var aInp=document.createElement("input");aInp.type="text";aInp.placeholder="답변 입력 (대소문자 무시)";aInp.className="toss-input";aInp.addEventListener("input",function(e){ans=e.target.value;});
+
+  function mkBtn(txt,color,onClick){var b=document.createElement("button");b.style.cssText="padding:14px;background:"+color+";border:none;border-radius:14px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;width:100%;margin-top:10px;";b.textContent=txt;b.addEventListener("click",onClick);return b;}
+  var pinCard=document.createElement("div");pinCard.className="toss-card";
+  pinCard.appendChild(h("div",{style:{fontSize:"16px",fontWeight:"700",marginBottom:"14px"}},"🔐 PIN 변경"));
+  var pinFields=document.createElement("div");pinFields.style.cssText="display:flex;flex-direction:column;gap:12px;";
+  [["현재 PIN",function(v){curP=v;}],["새 PIN (4자리)",function(v){newP=v;}],["새 PIN 확인",function(v){conP=v;}]].forEach(function(f){var d=document.createElement("div");d.style.marginBottom="2px";var lbl=document.createElement("div");lbl.style.cssText="font-size:13px;color:#8B95A1;font-weight:600;margin-bottom:6px;";lbl.textContent=f[0];d.appendChild(lbl);d.appendChild(pi("••••",f[1]));pinFields.appendChild(d);});
+  pinCard.appendChild(pinFields);pinCard.appendChild(pMsg);
+  pinCard.appendChild(mkBtn("PIN 변경하기","#3182F6",function(){var sp=loadLS("hh_pin",null);if(!sp){pMsg.textContent="현재 PIN이 없어요.";pMsg.style.color="#F04452";return;}if(curP!==sp){pMsg.textContent="현재 PIN이 틀렸어요.";pMsg.style.color="#F04452";return;}if(newP.length!==4){pMsg.textContent="새 PIN은 4자리여야 해요.";pMsg.style.color="#F04452";return;}if(newP!==conP){pMsg.textContent="새 PIN이 일치하지 않아요.";pMsg.style.color="#F04452";return;}saveLS("hh_pin",newP);pMsg.textContent="✅ PIN 변경됐어요!";pMsg.style.color="#00C471";setTimeout(function(){pMsg.textContent="";},3000);}));
+
+  var sqCard=document.createElement("div");sqCard.className="toss-card";
+  sqCard.appendChild(h("div",{style:{fontSize:"16px",fontWeight:"700",marginBottom:"14px"}},"❓ 비밀 질문 설정"));
+  if(esq)sqCard.appendChild(h("div",{style:{fontSize:"13px",color:"#4E5968",background:"#F2F4F6",borderRadius:"10px",padding:"10px 12px",marginBottom:"12px"}},"현재: "+esq.question));
+  var qLbl=document.createElement("div");qLbl.style.cssText="font-size:13px;color:#8B95A1;font-weight:600;margin-bottom:6px;";qLbl.textContent="질문 선택";
+  var aLbl=document.createElement("div");aLbl.style.cssText="font-size:13px;color:#8B95A1;font-weight:600;margin:10px 0 6px;";aLbl.textContent="답변";
+  sqCard.appendChild(qLbl);sqCard.appendChild(selEl);sqCard.appendChild(aLbl);sqCard.appendChild(aInp);sqCard.appendChild(sMsg);
+  sqCard.appendChild(mkBtn("비밀 질문 저장","#3182F6",function(){if(!ans.trim()){sMsg.textContent="답변을 입력해 주세요.";sMsg.style.color="#F04452";return;}saveLS("hh_secret_q",{question:selQ,answer:ans.trim()});sMsg.textContent="✅ 저장됐어요!";sMsg.style.color="#00C471";setTimeout(function(){sMsg.textContent="";},3000);}));
+  sqCard.appendChild(h("div",{style:{fontSize:"12px",color:"#B0B8C1",marginTop:"10px",lineHeight:"1.6"}},"💡 PIN 분실 시 비밀 질문 답변으로 재설정할 수 있어요."));
+  return h("div",{style:{display:"flex",flexDirection:"column",gap:"12px"}},pinCard,sqCard);
+}
+
+/* ── MONTH PICKER */
+function renderMonthPicker(year,month,onSel,onClose){
+  var py=year;
+  var wrap=document.createElement("div");wrap.style.cssText="background:#fff;border-radius:16px;padding:16px;margin-top:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);position:relative;z-index:10;";
+  function rb(){
+    wrap.innerHTML="";
+    var yr=document.createElement("div");yr.style.cssText="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;";
+    yr.appendChild(arrowBtn("‹",function(){py--;rb();}));
+    var yl=document.createElement("span");yl.style.cssText="font-size:16px;font-weight:700;color:#191F28;";yl.textContent=py+"년";yr.appendChild(yl);
+    yr.appendChild(arrowBtn("›",function(){py++;rb();}));wrap.appendChild(yr);
+    var grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;";
+    MONTHS.forEach(function(m,i){(function(mi){var btn=document.createElement("button");btn.style.cssText="padding:10px 0;background:"+(py===year&&i===month?"#3182F6":"#F2F4F6")+";border:none;border-radius:10px;color:"+(py===year&&i===month?"#fff":"#4E5968")+";font-size:14px;cursor:pointer;font-weight:"+(py===year&&i===month?"700":"400")+";";btn.textContent=m;btn.addEventListener("click",function(){onSel(py,mi);});grid.appendChild(btn);})(i);});wrap.appendChild(grid);
+  }
+  rb();return wrap;
+}
+
+/* ── RENDER LOOP */
+function render(){
+  var s=STATE,root=document.getElementById("root");root.innerHTML="";
+  var e;
+  if(!s.unlocked)e=renderPin();
+  else if(!s.fbLoaded)e=renderLoading();
+  else e=renderShell();
+  root.appendChild(e);
+}
+
+sub(render);render();
+</script>
+</body>
+</html>
