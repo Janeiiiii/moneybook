@@ -4,8 +4,32 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="우리집 가계부"/>
+<meta name="theme-color" content="#3182F6"/>
 <title>🏡 우리집 가계부</title>
+
+<!-- OG / 링크 미리보기 -->
+<meta property="og:title" content="🏡 우리집 가계부"/>
+<meta property="og:description" content="우리 둘만의 월별 가계부"/>
+<meta property="og:type" content="website"/>
+<meta property="og:image" content="https://raw.githubusercontent.com/Janeiiiii/moneybook/main/og-image.png"/>
+
+<!-- PWA manifest (inline) -->
+<link rel="manifest" href="data:application/json,{
+  &quot;name&quot;: &quot;우리집 가계부&quot;,
+  &quot;short_name&quot;: &quot;가계부&quot;,
+  &quot;start_url&quot;: &quot;/&quot;,
+  &quot;display&quot;: &quot;standalone&quot;,
+  &quot;background_color&quot;: &quot;#F2F4F6&quot;,
+  &quot;theme_color&quot;: &quot;#3182F6&quot;,
+  &quot;icons&quot;: [
+    {&quot;src&quot;: &quot;https://raw.githubusercontent.com/Janeiiiii/moneybook/main/icon.png&quot;, &quot;sizes&quot;: &quot;192x192&quot;, &quot;type&quot;: &quot;image/png&quot;},
+    {&quot;src&quot;: &quot;https://raw.githubusercontent.com/Janeiiiii/moneybook/main/icon.png&quot;, &quot;sizes&quot;: &quot;512x512&quot;, &quot;type&quot;: &quot;image/png&quot;}
+  ]
+}"/>
+<!-- Apple touch icon -->
+<link rel="apple-touch-icon" href="https://raw.githubusercontent.com/Janeiiiii/moneybook/main/icon.png"/>
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet"/>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
