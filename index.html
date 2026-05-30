@@ -799,19 +799,18 @@ function renderLedger(c){
   }
 
   // 수입 대비
-  var wDiff=c.wT-c.wGO;
-  var hDiff=c.hT-c.hGO;
+  // 수입 대비 = 비비상금 (수입 - 적금 - 지출 = 나머지)
   var diffGrid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginTop:"16px"}});
 
-  var wBox=h("div",{style:{background:wDiff>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
-  wBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"6px"}},"👩 아내 수입 대비"));
-  wBox.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:wDiff>=0?"#0F9648":"#F04452"}},sign(wDiff)+fmt(wDiff)));
-  if(c.wT>0) wBox.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1"}},sign(wDiff/c.wT*100)+fmtPct(Math.abs(wDiff/c.wT*100))));
+  var wBox=h("div",{style:{background:c.wBB>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
+  wBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"4px"}},"👩 아내 비비상금"));
+  wBox.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:c.wBB>=0?"#0F9648":"#F04452"}},fmt(c.wBB)));
+  if(c.wT>0) wBox.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1"}},fmtPct(c.wBB/c.wT*100)));
 
-  var hBox=h("div",{style:{background:hDiff>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
-  hBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"6px"}},"👨 남편 수입 대비"));
-  hBox.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:hDiff>=0?"#0F9648":"#F04452"}},sign(hDiff)+fmt(hDiff)));
-  if(c.hT>0) hBox.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1"}},sign(hDiff/c.hT*100)+fmtPct(Math.abs(hDiff/c.hT*100))));
+  var hBox=h("div",{style:{background:c.hBB>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
+  hBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"4px"}},"👨 남편 비비상금"));
+  hBox.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:c.hBB>=0?"#0F9648":"#F04452"}},fmt(c.hBB)));
+  if(c.hT>0) hBox.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1"}},fmtPct(c.hBB/c.hT*100)));
 
   diffGrid.appendChild(wBox);
   diffGrid.appendChild(hBox);
