@@ -165,7 +165,7 @@ function loadLS(k,fb){try{var v=localStorage.getItem(k);return v?JSON.parse(v):f
 function saveLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
 var kst=getKST();
-var STATE={unlocked:false,menu:"dashboard",sideOpen:false,year:kst.getFullYear(),month:kst.getMonth(),settingsTab:"main",statsOpen:false,statsPeriod:"3m",monthPickerOpen:false,tooltip:null,syncStatus:"idle",allData:{},settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),settingsHistory:[],fbLoaded:false};
+var STATE={masterOk:false,unlocked:false,menu:"dashboard",sideOpen:false,year:kst.getFullYear(),month:kst.getMonth(),settingsTab:"main",statsOpen:false,statsPeriod:"3m",monthPickerOpen:false,tooltip:null,syncStatus:"idle",allData:{},settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),settingsHistory:[],fbLoaded:false};
 var _L=[];
 function getS(){return STATE;}
 function setS(p){for(var k in p)STATE[k]=p[k];for(var i=0;i<_L.length;i++)_L[i](STATE);}
@@ -275,6 +275,73 @@ function itemRowToss(label,emoji,defVal,storeKey,info,highlight,c,setMD){
 }
 
 /* ── PIN SCREEN */
+
+// ─── Master Password (접속 비밀번호 - 하드코딩) ──────────────────────────────
+function simpleHashGlobal(str){var hash=0;for(var i=0;i<str.length;i++){hash=((hash<<5)-hash)+str.charCodeAt(i);hash=hash&hash;}return hash.toString(36);}
+
+// 기본 비밀번호 해시 (21020926)
+var DEFAULT_MASTER_HASH = simpleHashGlobal("21020926");
+
+function renderMasterPw(){
+  // 저장된 해시 확인 (변경된 경우 Firebase에서 가져옴)
+  var savedHash = loadLS("hh_master_hash", null) || DEFAULT_MASTER_HASH;
+  var input = "";
+
+  var root=h("div",{style:{minHeight:"100vh",background:"#F0F4FF",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}});
+  var wrap=h("div",{style:{width:"100%",maxWidth:"360px",display:"flex",flexDirection:"column",alignItems:"center",gap:"14px"}});
+
+  wrap.appendChild(h("div",{style:{fontSize:"52px",marginBottom:"4px"}},"🔐"));
+  wrap.appendChild(h("div",{style:{fontSize:"22px",fontWeight:"800",color:"#191F28"}},"우리집 가계부"));
+  wrap.appendChild(h("div",{style:{fontSize:"15px",color:"#8B95A1",marginBottom:"8px",textAlign:"center"}},"접속 비밀번호를 입력해 주세요"));
+
+  var inpWrap=h("div",{style:{position:"relative",width:"100%"}});
+  var inp=h("input",{type:"password",style:{
+    width:"100%",boxSizing:"border-box",
+    background:"#fff",border:"1.5px solid #E5E8EB",
+    borderRadius:"12px",color:"#191F28",
+    fontSize:"18px",fontWeight:"600",
+    padding:"14px 18px",outline:"none"
+  },placeholder:"비밀번호 입력"});
+  inp.addEventListener("input",function(e){input=e.target.value;});
+  inpWrap.appendChild(inp);
+  wrap.appendChild(inpWrap);
+
+  var errEl=h("div",{style:{fontSize:"14px",color:"#F04452",fontWeight:"600",minHeight:"18px",textAlign:"center"}});
+  wrap.appendChild(errEl);
+
+  var confirmBtn=h("button",{style:{
+    width:"100%",padding:"16px",
+    background:"#3182F6",border:"none",
+    borderRadius:"14px",color:"#fff",
+    fontSize:"17px",fontWeight:"700",cursor:"pointer"
+  }},"입력");
+
+  confirmBtn.addEventListener("click",function(){
+    if(!input.trim()){errEl.textContent="비밀번호를 입력해 주세요.";return;}
+    if(simpleHashGlobal(input)===savedHash){
+      saveLS("hh_master_hash", savedHash);
+      setS({masterOk:true,unlocked:true});
+      render();
+    } else {
+      errEl.textContent="비밀번호가 틀렸어요.";
+      inp.value=""; input="";
+    }
+  });
+
+  inp.addEventListener("keydown",function(e){if(e.key==="Enter")confirmBtn.click();});
+  wrap.appendChild(confirmBtn);
+
+  // Firebase에서 변경된 비밀번호 동기화
+  fbListen("masterHash",function(d){
+    if(d&&d.hash){
+      saveLS("hh_master_hash",d.hash);
+    }
+  });
+
+  root.appendChild(wrap);
+  return root;
+}
+
 function renderPin(){
   var savedPin=loadLS("hh_pin",null),phase=savedPin?"enter":"set",inp="",firstPin="";
   var root=h("div",{style:{minHeight:"100vh",background:"#f5f6fa",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}});
@@ -1054,7 +1121,44 @@ function renderSecurity(){
   sqCard.appendChild(qLbl);sqCard.appendChild(selEl);sqCard.appendChild(aLbl);sqCard.appendChild(aInp);sqCard.appendChild(sMsg);
   sqCard.appendChild(mkBtn("비밀 질문 저장","#3182F6",function(){if(!ans.trim()){sMsg.textContent="답변을 입력해 주세요.";sMsg.style.color="#F04452";return;}saveLS("hh_secret_q",{question:selQ,answer:ans.trim()});sMsg.textContent="✅ 저장됐어요!";sMsg.style.color="#00C471";setTimeout(function(){sMsg.textContent="";},3000);}));
   sqCard.appendChild(h("div",{style:{fontSize:"12px",color:"#B0B8C1",marginTop:"10px",lineHeight:"1.6"}},"💡 PIN 분실 시 비밀 질문 답변으로 재설정할 수 있어요."));
-  return h("div",{style:{display:"flex",flexDirection:"column",gap:"12px"}},pinCard,sqCard);
+  // 접속 비밀번호 변경 카드
+  function simpleHash2(s2){var h2=0;for(var i2=0;i2<s2.length;i2++){h2=((h2<<5)-h2)+s2.charCodeAt(i2);h2=h2&h2;}return h2.toString(36);}
+  var mpwCur="",mpwV1="",mpwV2="";
+  var mpwMsg=h("div",{style:{fontSize:"13px",fontWeight:"600",minHeight:"18px"}});
+  var mpwInp=h("input",{type:"password",style:{width:"100%",boxSizing:"border-box",background:"#F9FAFB",border:"1.5px solid #E5E8EB",borderRadius:"10px",color:"#191F28",fontSize:"16px",padding:"12px 14px",outline:"none"},placeholder:"새 접속 비밀번호"});
+  mpwInp.addEventListener("input",function(e){mpwV1=e.target.value;});
+  var mpwInp2=h("input",{type:"password",style:{width:"100%",boxSizing:"border-box",background:"#F9FAFB",border:"1.5px solid #E5E8EB",borderRadius:"10px",color:"#191F28",fontSize:"16px",padding:"12px 14px",outline:"none"},placeholder:"새 접속 비밀번호 확인"});
+  mpwInp2.addEventListener("input",function(e){mpwV2=e.target.value;});
+  var mpwBtn=h("button",{style:{padding:"14px",background:"#3182F6",border:"none",borderRadius:"12px",color:"#fff",fontSize:"16px",fontWeight:"700",cursor:"pointer",width:"100%",marginTop:"10px"}},"접속 비밀번호 변경");
+  mpwBtn.addEventListener("click",function(){
+    // 기존 비밀번호 확인
+    var curHash=loadLS("hh_master_hash",null)||DEFAULT_MASTER_HASH;
+    if(!mpwCur){mpwMsg.textContent="현재 비밀번호를 입력해 주세요.";mpwMsg.style.color="#F04452";return;}
+    if(simpleHash2(mpwCur)!==curHash){mpwMsg.textContent="현재 비밀번호가 틀렸어요.";mpwMsg.style.color="#F04452";return;}
+    if(!mpwV1){mpwMsg.textContent="새 비밀번호를 입력해 주세요.";mpwMsg.style.color="#F04452";return;}
+    if(mpwV1.length<4){mpwMsg.textContent="4자리 이상 입력해 주세요.";mpwMsg.style.color="#F04452";return;}
+    if(mpwV1!==mpwV2){mpwMsg.textContent="새 비밀번호가 일치하지 않아요.";mpwMsg.style.color="#F04452";return;}
+    var nh=simpleHash2(mpwV1);
+    saveLS("hh_master_hash",nh);
+    fbSet("masterHash",{hash:nh});
+    mpwMsg.textContent="✅ 접속 비밀번호가 변경됐어요!";mpwMsg.style.color="#0F9648";
+    mpwCurInp.value="";mpwInp.value="";mpwInp2.value="";mpwCur="";mpwV1="";mpwV2="";
+    setTimeout(function(){mpwMsg.textContent="";},3000);
+  });
+  var masterCard=document.createElement("div");masterCard.className="toss-card";
+  masterCard.appendChild(h("div",{style:{fontSize:"16px",fontWeight:"700",marginBottom:"6px"}},"🔑 접속 비밀번호"));
+  masterCard.appendChild(h("div",{style:{fontSize:"13px",color:"#8B95A1",marginBottom:"14px",lineHeight:"1.6"}},"URL을 알아도 이 비밀번호 없이 접근 불가해요. 나와 남편이 공유하는 비밀번호예요."));
+  var mpwCurInp=h("input",{type:"password",style:{width:"100%",boxSizing:"border-box",background:"#F9FAFB",border:"1.5px solid #E5E8EB",borderRadius:"10px",color:"#191F28",fontSize:"16px",padding:"12px 14px",outline:"none"},placeholder:"현재 접속 비밀번호"});
+  mpwCurInp.addEventListener("input",function(e){mpwCur=e.target.value;});
+  masterCard.appendChild(h("div",{style:{fontSize:"13px",color:"#8B95A1",fontWeight:"600",marginBottom:"6px"}},"현재 비밀번호"));
+  masterCard.appendChild(mpwCurInp);
+  masterCard.appendChild(h("div",{style:{fontSize:"13px",color:"#8B95A1",fontWeight:"600",margin:"10px 0 6px"}},"새 비밀번호"));
+  masterCard.appendChild(mpwInp);
+  masterCard.appendChild(h("div",{style:{fontSize:"13px",color:"#8B95A1",fontWeight:"600",margin:"10px 0 6px"}},"비밀번호 확인"));
+  masterCard.appendChild(mpwInp2);
+  masterCard.appendChild(mpwMsg);
+  masterCard.appendChild(mpwBtn);
+  return h("div",{style:{display:"flex",flexDirection:"column",gap:"12px"}},masterCard);
 }
 
 /* ── MONTH PICKER */
@@ -1077,7 +1181,7 @@ function renderMonthPicker(year,month,onSel,onClose){
 function render(){
   var s=STATE,root=document.getElementById("root");root.innerHTML="";
   var e;
-  if(!s.unlocked)e=renderPin();
+  if(!s.masterOk)e=renderMasterPw();
   else if(!s.fbLoaded)e=renderLoading();
   else e=renderShell();
   root.appendChild(e);
