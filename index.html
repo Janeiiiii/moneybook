@@ -506,7 +506,7 @@ function renderDashboard(c){
   var husDtl=h("div",null);
   function addSubH(label){var el=h("div",{style:{fontSize:"13px",fontWeight:"700",color:"#8B95A1",marginBottom:"4px",marginTop:"12px"}});el.textContent=label;husDtl.appendChild(el);}
   function addRowH(lbl,val,col){var el=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #F2F4F6"}},h("span",{style:{fontSize:"15px",color:"#6B7684"}},lbl),h("span",{style:{fontSize:"15px",fontWeight:"600",color:col||"#191F28"}},val));husDtl.appendChild(el);}
-  addSubH("수입"); addRowH("월급",fmt(c.husbandSalary));
+  addSubH("수입"); addRowH("월급",fmt(c.hS));
   if(c.t1) addRowH(" ↳ "+(ex[0]||{label:"떡값1"}).label,fmt(c.t1a));
   if(c.t2) addRowH(" ↳ "+(ex[1]||{label:"떡값2"}).label,fmt(c.t2a));
   if(c.t1||c.t2) addRowH("합산 수입",fmt(c.hT));
