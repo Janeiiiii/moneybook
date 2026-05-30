@@ -144,8 +144,19 @@ button:active{opacity:0.75;}
 <div id="root"></div>
 <script>
 var db=null;
-try{firebase.initializeApp({apiKey:"AIzaSyByyxptM93jgDZvn5e8vHj_7cKTYJOxxiY",authDomain:"moneybook-23e35.firebaseapp.com",projectId:"moneybook-23e35"});db=firebase.firestore();}catch(e){console.error("FB init fail",e);}
-function fbSet(id,data){if(!db)return Promise.resolve(false);return db.collection("household").doc(id).set(data,{merge:true}).then(function(){return true;}).catch(function(e){console.error(e);return false;});}
+try{firebase.initializeApp({apiKey:"AIzaSyD_e4KlgVTS839T1V9UXzZ0y6_WyvsXSc0",authDomain:"moneybook-d8c16.firebaseapp.com",projectId:"moneybook-d8c16",storageBucket:"moneybook-d8c16.firebasestorage.app",messagingSenderId:"784362263911",appId:"1:784362263911:web:32963575923e05b2fc8bc2"});db=firebase.firestore();}catch(e){console.error("FB init fail",e);}
+function fbSet(id,data){
+  // Also save to localStorage as backup cache
+  try{
+    if(id==="allData"){
+      var cached=loadLS("hh_cache_alldata",{});
+      for(var ck in data) cached[ck]=data[ck];
+      saveLS("hh_cache_alldata",cached);
+    }
+  }catch(e){}
+  if(!db)return Promise.resolve(false);
+  return db.collection("household").doc(id).set(data,{merge:true}).then(function(){return true;}).catch(function(e){console.error(e);return false;});
+}
 function fbListen(id,cb){if(!db){setTimeout(function(){cb(null);},200);return function(){};}return db.collection("household").doc(id).onSnapshot(function(s){cb(s.exists?s.data():null);},function(e){console.error(e);cb(null);});}
 
 var MONTHS=["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
@@ -176,7 +187,18 @@ function checkReady(){if(_allL&&_setL)setS({fbLoaded:true});}
 function startFB(){
   if(_fbStarted)return;_fbStarted=true;
   setTimeout(function(){if(!STATE.fbLoaded)setS({fbLoaded:true});},8000);
-  fbListen("allData",function(d){setS({allData:d||{}});_allL=true;checkReady();});
+  // Load from local cache immediately (fast)
+  var localCache=loadLS("hh_cache_alldata",null);
+  if(localCache) setS({allData:localCache});
+  // Then sync with Firebase (authoritative)
+  fbListen("allData",function(d){
+    if(d){
+      // Merge Firebase data with any local changes
+      saveLS("hh_cache_alldata",d);
+      setS({allData:d});
+    }
+    _allL=true;checkReady();
+  });
   fbListen("settings",function(d){if(d)setS({settings:mergeS(d)});_setL=true;checkReady();});
   fbListen("settingsHistory",function(d){setS({settingsHistory:(d&&d.list)||[]});});
 }
@@ -320,8 +342,18 @@ function renderMasterPw(){
     if(!input.trim()){errEl.textContent="비밀번호를 입력해 주세요.";return;}
     if(simpleHashGlobal(input)===savedHash){
       saveLS("hh_master_hash", savedHash);
+      saveLS("hh_master_hash", savedHash);
       setS({masterOk:true,unlocked:true});
+      startFB();
       render();
+      // 비밀번호 변경 여부 Firebase에서 확인 (백그라운드)
+      setTimeout(function(){
+        fbListen("masterHash",function(d){
+          if(d&&d.hash&&d.hash!==loadLS("hh_master_hash",null)){
+            saveLS("hh_master_hash",d.hash);
+          }
+        });
+      },500);
     } else {
       errEl.textContent="비밀번호가 틀렸어요.";
       inp.value=""; input="";
@@ -331,12 +363,7 @@ function renderMasterPw(){
   inp.addEventListener("keydown",function(e){if(e.key==="Enter")confirmBtn.click();});
   wrap.appendChild(confirmBtn);
 
-  // Firebase에서 변경된 비밀번호 동기화
-  fbListen("masterHash",function(d){
-    if(d&&d.hash){
-      saveLS("hh_master_hash",d.hash);
-    }
-  });
+
 
   root.appendChild(wrap);
   return root;
@@ -796,16 +823,23 @@ function renderLedger(c){
   var btnLabel=s.syncStatus==="saved"?"✅ 저장됐어요!":s.syncStatus==="saving"?"⏳ 저장 중...":s.syncStatus==="error"?"❌ 오류 발생":"💾 저장하기";
   var saveBtn=h("button",{style:{display:"block",width:"100%",padding:"17px",border:"none",borderRadius:"14px",fontSize:"17px",fontWeight:"700",cursor:"pointer",color:"#fff",background:btnBg,marginBottom:"20px"}},btnLabel);
   saveBtn.addEventListener("click",function(){
+    // Always read FRESH data from STATE at time of save
+    var s2=STATE;
+    var c2=compute();
+    var mKey2=c2.mKey;
+    var freshMd=s2.allData[mKey2]||{};
     var snap={};
     var k;
-    for(k in c.md) snap[k]=c.md[k];
-    snap._totalExpenses=c.totE;
-    snap._totalSavings=c.totS;
-    snap._totalIncome=c.totI;
+    for(k in freshMd) snap[k]=freshMd[k];
+    snap._totalExpenses=c2.totE;
+    snap._totalSavings=c2.totS;
+    snap._totalIncome=c2.totI;
     setS({syncStatus:"saving"});
     var payload={};
-    payload[c.mKey]=snap;
+    payload[mKey2]=snap;
+    console.log("Saving to Firebase:", mKey2, JSON.stringify(snap).slice(0,100));
     fbSet("allData",payload).then(function(ok){
+      console.log("Firebase save result:", ok);
       setS({syncStatus:ok?"saved":"error"});
       setTimeout(function(){setS({syncStatus:"idle"});},2500);
     });
