@@ -157,7 +157,37 @@ function sign(n){return n>=0?"+":"";}
 function N(v,fb){var r=Number(v);return isNaN(r)?fb:r;}
 
 var LOAN_BASE={rate:3.977,totalInstallments:480,startInstallment:10,baseMonth:{year:2026,month:4},baseBalance:244273746,monthlyPayment:1026286,basePrincipal:216007,baseInterest:810279,autoTransferUntil:"2027.09"};
-function calcLoan(cfg,year,month){var base=cfg||LOAN_BASE;var diff=(year-base.baseMonth.year)*12+(month-base.baseMonth.month);var inst=base.startInstallment+diff;if(inst<1||inst>base.totalInstallments)return null;var r=base.rate/100/12;var bal=N(base.baseBalance,0),prin=N(base.basePrincipal,0),intr=N(base.baseInterest,0);if(diff>0){for(var i=0;i<diff;i++){intr=Math.round(bal*r);prin=Math.round(base.monthlyPayment-intr);bal=bal-prin;}}else if(diff<0){bal=N(base.baseBalance,0)+N(base.basePrincipal,0)*Math.abs(diff);intr=Math.round(bal*r);prin=Math.round(base.monthlyPayment-intr);}return{installment:inst,monthlyPayment:N(base.monthlyPayment,0),principal:Math.round(prin),interest:Math.round(intr),balance:Math.round(diff>0?bal:N(base.baseBalance,0)+N(base.basePrincipal,0)*Math.abs(diff)),remaining:base.totalInstallments-inst};}
+function calcLoan(cfg,year,month,allData){
+  var base=cfg||LOAN_BASE;
+  var diff=(year-base.baseMonth.year)*12+(month-base.baseMonth.month);
+  var inst=base.startInstallment+diff;
+  if(inst<1||inst>base.totalInstallments)return null;
+  var r=base.rate/100/12;
+  if(diff<=0){
+    // 기준월 이전: 근사식 (기준월 자체는 설정값 그대로)
+    var bal0=N(base.baseBalance,0)+N(base.basePrincipal,0)*Math.abs(diff);
+    var intr0=Math.round(bal0*r);
+    var prin0=Math.round(N(base.monthlyPayment,0)-intr0);
+    if(diff===0){bal0=N(base.baseBalance,0);prin0=N(base.basePrincipal,0);intr0=N(base.baseInterest,0);}
+    return{installment:inst,monthlyPayment:N(base.monthlyPayment,0),principal:Math.round(prin0),interest:Math.round(intr0),balance:Math.round(bal0),remaining:base.totalInstallments-inst};
+  }
+  // 기준월 이후: 매달 실제 입력(수기) 또는 자동계산 값을 그대로 누적해서 잔금을 계산.
+  // 가계부 작성 페이지에서 입력한 월상환금_amt/납부원금_amt/대출이자_amt 가 있으면 그 값을 그대로 쓰고,
+  // 없으면 (이전 잔금 기준) 자동계산값을 쓴다 — 그 결과가 다음 달 계산의 기초가 된다.
+  var bal=N(base.baseBalance,0);
+  var y=base.baseMonth.year,m=base.baseMonth.month;
+  var pay=N(base.monthlyPayment,0),prin=N(base.basePrincipal,0),intr=N(base.baseInterest,0);
+  var ad=allData||{};
+  for(var i=1;i<=diff;i++){
+    m++; if(m>11){m=0;y++;}
+    var md=ad[y+"-"+m]||{};
+    pay=md["월상환금_amt"]!==undefined?N(md["월상환금_amt"],N(base.monthlyPayment,0)):N(base.monthlyPayment,0);
+    intr=md["대출이자_amt"]!==undefined?N(md["대출이자_amt"],0):Math.round(bal*r);
+    prin=md["납부원금_amt"]!==undefined?N(md["납부원금_amt"],0):Math.round(pay-intr);
+    bal=bal-prin;
+  }
+  return{installment:inst,monthlyPayment:Math.round(pay),principal:Math.round(prin),interest:Math.round(intr),balance:Math.round(bal),remaining:base.totalInstallments-inst};
+}
 function getEventExp(year,month){if(year>2026||(year===2026&&month>=11)){if(month===11)return{amount:1600000,detail:"부모님 용돈 (연 1회)"};return{amount:70000,detail:"경조사비"};}return{amount:200000,detail:"경조사비 (부모님 용돈/선물)"};}
 
 var DEFAULT_SETTINGS={wife:{savings:[{id:"도약적금",label:"도약적금",emoji:"💰",amount:500000}],expenses:[{id:"고정비_나",label:"고정비 (보험포함, 관리비)",emoji:"🤑",amount:900000},{id:"용돈_나",label:"용돈",emoji:"💵",amount:300000}],incomeToggle:[{id:"추가수입_아내",label:"추가 수입",emoji:"💵",amount:0}]},husband:{expenseToggle:[{id:"떡값1",label:"떡값 1️⃣",emoji:"💰",amount:1000000,info:"재산세 통장으로"},{id:"떡값2",label:"떡값 2️⃣",emoji:"💰",amount:1000000,info:"자동차 보험, 세금"}],incomeToggle:[{id:"추가수입_남편",label:"추가 수입",emoji:"💵",amount:0}],savings:[{id:"주식",label:"주식",emoji:"📈",amount:800000}],expenses:[{id:"비상금",label:"비상금",emoji:"🛡️",amount:150000},{id:"마미대출",label:"마미(대출)",emoji:"💸",amount:170000},{id:"경조사비",label:"경조사비",emoji:"🎁",amount:200000,info:"부모님 용돈/선물"},{id:"생활비",label:"생활비",emoji:"🛒",amount:550000},{id:"여행비",label:"여행비",emoji:"✈️",amount:250000},{id:"고정비_남",label:"고정비",emoji:"🤑",amount:362040},{id:"용돈_남",label:"용돈",emoji:"💵",amount:160000}]},loan:{rate:3.977,totalInstallments:480,startInstallment:10,baseMonth:{year:2026,month:4},baseBalance:244273746,monthlyPayment:1026286,basePrincipal:216007,baseInterest:810279,autoTransferUntil:"2027.09"}};
@@ -194,8 +224,8 @@ function startFB(){
 }
 function mergeS(d){try{var s=JSON.parse(JSON.stringify(DEFAULT_SETTINGS));if(d.wife){if(Array.isArray(d.wife.savings))s.wife.savings=d.wife.savings;if(Array.isArray(d.wife.expenses))s.wife.expenses=d.wife.expenses;if(Array.isArray(d.wife.incomeToggle))s.wife.incomeToggle=d.wife.incomeToggle;}if(d.husband){if(Array.isArray(d.husband.expenseToggle))s.husband.expenseToggle=d.husband.expenseToggle;if(Array.isArray(d.husband.incomeToggle))s.husband.incomeToggle=d.husband.incomeToggle;if(Array.isArray(d.husband.savings))s.husband.savings=d.husband.savings;if(Array.isArray(d.husband.expenses))s.husband.expenses=d.husband.expenses;}if(d.loan){s.loan={};for(var kk in LOAN_BASE)s.loan[kk]=LOAN_BASE[kk];for(var kk in d.loan)s.loan[kk]=d.loan[kk];}return s;}catch(e){return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));}}
 
-function compute(){
-  var s=STATE,year=s.year,month=s.month,mKey=year+"-"+month,md=s.allData[mKey]||{},cfg=s.settings.loan||LOAN_BASE;
+function compute(yArg,mArg){
+  var s=STATE,year=(yArg!==undefined?yArg:s.year),month=(mArg!==undefined?mArg:s.month),mKey=year+"-"+month,md=s.allData[mKey]||{},cfg=s.settings.loan||LOAN_BASE;
   function g(f,fb){return md[f]!==undefined?md[f]:fb;}
   var wS=N(g("wifeSalary",0),0),hS=N(g("husbandSalary",0),0);
   var exTog=s.settings.husband.expenseToggle||[];
@@ -207,7 +237,10 @@ function compute(){
   var wAddActive=g(wInc.id+"_active",false),wAddAmt=wAddActive?N(g(wInc.id+"_amt",wInc.amount),wInc.amount):0;
   var hAddActive=g(hInc.id+"_active",false),hAddAmt=hAddActive?N(g(hInc.id+"_amt",hInc.amount),hInc.amount):0;
   var wT=wS+wAddAmt,hT=hS+hAddAmt,totI=wT+hT;
-  var li=calcLoan(cfg,year,month);
+  // 주담대: 가계부 작성 페이지의 월상환금_amt/납부원금_amt/대출이자_amt 수기 입력이 있으면
+  // 그 값을 그대로 쓰고, 없으면 설정의 기준값을 토대로 자동계산한다. (calcLoan이 누적 처리)
+  var li=calcLoan(cfg,year,month,s.allData);
+  var lPay=li?li.monthlyPayment:N(cfg.monthlyPayment,0);
   var lP=li?li.principal:N(cfg.basePrincipal,0),lI=li?li.interest:N(cfg.baseInterest,0),lB=li?li.balance:N(cfg.baseBalance,0);
   var evE=getEventExp(year,month);
 
@@ -254,7 +287,22 @@ function compute(){
   var hSav0=stockItem?N(g(stockItem.id+"_amt",stockDefault),stockDefault):stockDefault;
   var hTS=hSav0+hSavRestTotal+hBB,hGO=hTS+hTE,hD=hT-hGO;
   var totE=wTE+hTE,totS=wTS+hTS;
-  return{mKey:mKey,md:md,g:g,lCfg:cfg,wS:wS,hS:hS,t1:t1,t2:t2,t1a:t1a,t2a:t2a,wInc:wInc,hInc:hInc,wAddActive:wAddActive,wAddAmt:wAddAmt,hAddActive:hAddActive,hAddAmt:hAddAmt,wT:wT,hT:hT,totI:totI,li:li,lP:lP,lI:lI,lB:lB,evE:evE,evA:evA,hSav0:hSav0,stockDefault:stockDefault,hBBa:hBBa,hBB:hBB,wTS:wTS,wTE:wTE,wGO:wGO,wD:wD,hTS:hTS,hTE:hTE,hGO:hGO,hD:hD,totE:totE,totS:totS};
+  return{year:year,month:month,mKey:mKey,md:md,g:g,lCfg:cfg,wS:wS,hS:hS,t1:t1,t2:t2,t1a:t1a,t2a:t2a,wInc:wInc,hInc:hInc,wAddActive:wAddActive,wAddAmt:wAddAmt,hAddActive:hAddActive,hAddAmt:hAddAmt,wT:wT,hT:hT,totI:totI,li:li,lPay:lPay,lP:lP,lI:lI,lB:lB,evE:evE,evA:evA,hSav0:hSav0,stockDefault:stockDefault,hBBa:hBBa,hBB:hBB,wTS:wTS,wTE:wTE,wGO:wGO,wD:wD,hTS:hTS,hTE:hTE,hGO:hGO,hD:hD,totE:totE,totS:totS};
+}
+// 총 비비상금: 현재까지 기록된(또는 진행중인) 매월의 남편 비비상금 값을 모두 더한 누적 합계
+function totalAccumulatedHBB(uptoYear,uptoMonth){
+  var s=STATE,total=0,seen={};
+  for(var k in s.allData){
+    var parts=k.split("-");var ky=parseInt(parts[0],10),km=parseInt(parts[1],10);
+    if(isNaN(ky)||isNaN(km))continue;
+    if(ky<uptoYear||(ky===uptoYear&&km<=uptoMonth)){
+      total+=compute(ky,km).hBB;
+      seen[k]=true;
+    }
+  }
+  var curKey=uptoYear+"-"+uptoMonth;
+  if(!seen[curKey]) total+=compute(uptoYear,uptoMonth).hBB;
+  return total;
 }
 
 // DOM helper
@@ -516,10 +564,11 @@ function renderDashboard(c){
   if(c.wAddActive) addRow(" ↳ "+c.wInc.label,fmt(c.wAddAmt));
   addSub("적금"); addRow("적금 합계",fmt(c.wTS),"#1CD66B");
   ws.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRow(" ↳ "+it.label,fmt(a));});
-  addRow(" ↳ 납부원금 (주담대)",fmt(c.lP));
+  addRow(" ↳ 대출 원금",fmt(c.lP));
   addSub("지출"); addRow("지출 합계",fmt(c.wTE),"#F04452");
   we.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRow(" ↳ "+it.label,fmt(a));});
-  addRow(" ↳ 대출이자 (주담대)",fmt(c.lI)); addRow("대출잔금",fmt(c.lB),"#F04452");
+  addRow(" ↳ 대출 이자",fmt(c.lI));
+  addSub("🏠 주택담보대출"); addRow("월 상환금",fmt(c.lPay)); addRow("대출 원금",fmt(c.lP)); addRow("대출 이자",fmt(c.lI)); addRow("대출잔금",fmt(c.lB),"#F04452");
 
   // Husband details
   var hs=s.settings.husband.savings||[]; var he=s.settings.husband.expenses||[]; var exTog=s.settings.husband.expenseToggle||[];
@@ -748,22 +797,36 @@ function renderLedger(c){
   for(i=0;i<ws.length;i++){
     wCard.appendChild(itemInput(ws[i].label,ws[i].emoji,ws[i].amount,ws[i].id+"_amt",false));
   }
-  wCard.appendChild(itemInput("납부원금 (주담대)","🏦",c.lP,"납부원금_amt",false));
 
   wCard.appendChild(secHdr("💸","지출",c.wTE,c.wT,"#F04452"));
   for(i=0;i<we.length;i++){
     wCard.appendChild(itemInput(we[i].label,we[i].emoji,we[i].amount,we[i].id+"_amt",false));
   }
-  wCard.appendChild(itemInput("대출이자 (주담대)","🏦",c.lI,"대출이자_amt",false));
+
+  // ── 주택담보대출 (대분류) ── 월상환금/대출원금/대출이자를 한데 묶어서 보여주되,
+  // 계산상으로는 대출원금→적금 합계, 대출이자→지출 합계에 그대로 포함된다.
+  var loanHdr=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0 10px",borderBottom:"2px solid #E5E8EB",marginBottom:"4px",marginTop:"4px"}});
+  var loanHdrLeft=h("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
+  loanHdrLeft.appendChild(h("span",{style:{fontSize:"18px"}},"🏠"));
+  loanHdrLeft.appendChild(h("span",{style:{fontSize:"17px",fontWeight:"800",color:"#191F28"}},"주택담보대출"));
+  loanHdr.appendChild(loanHdrLeft);
+  var loanHdrRight=h("div",{style:{textAlign:"right"}});
+  loanHdrRight.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1"}},"대출잔금"));
+  loanHdrRight.appendChild(h("div",{style:{fontSize:"16px",fontWeight:"700",color:"#F04452"}},fmt(c.lB)));
+  loanHdr.appendChild(loanHdrRight);
+  wCard.appendChild(loanHdr);
+  wCard.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1",margin:"0 2px 10px"}},"자동 계산이 기본값이고 직접 수정도 가능해요 · 대출원금은 적금 합계, 대출이자는 지출 합계에 포함돼요"));
+  wCard.appendChild(itemInput("월 상환금","🏦",c.lPay,"월상환금_amt",false));
+  wCard.appendChild(itemInput("대출 원금 (적금 합계 포함)","💰",c.lP,"납부원금_amt",true));
+  wCard.appendChild(itemInput("대출 이자 (지출 합계 포함)","💸",c.lI,"대출이자_amt",true));
 
   // 대출 정보
   var lbox=h("div",{style:{background:"#F9FAFB",borderRadius:"12px",padding:"14px",marginTop:"8px"}});
-  lbox.appendChild(h("div",{style:{fontSize:"14px",fontWeight:"700",color:"#4E5968",marginBottom:"10px"}},"🏠 주택담보대출"));
-  var ldata=[["월 상환금",fmt(c.lCfg?c.lCfg.monthlyPayment:LOAN_BASE.monthlyPayment)],["납부원금",fmt(c.lP)],["대출이자",fmt(c.lI)],["대출잔금",fmt(c.lB)],["금리",(c.lCfg?c.lCfg.rate:LOAN_BASE.rate)+"%"]];
+  var ldata=[["금리",(c.lCfg?c.lCfg.rate:LOAN_BASE.rate)+"%"],["회차",c.li?(c.li.installment+" / "+(c.lCfg?c.lCfg.totalInstallments:LOAN_BASE.totalInstallments)+"회"):"—"],["자동이체 종료",(c.lCfg?c.lCfg.autoTransferUntil:LOAN_BASE.autoTransferUntil)||"—"]];
   for(i=0;i<ldata.length;i++){
     var lr=h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"14px",padding:"5px 0",borderBottom:"1px solid #F2F4F6"}});
     lr.appendChild(h("span",{style:{color:"#8B95A1"}},ldata[i][0]));
-    lr.appendChild(h("span",{style:{fontWeight:"600",color:i===3?"#F04452":"#191F28"}},ldata[i][1]));
+    lr.appendChild(h("span",{style:{fontWeight:"600",color:"#191F28"}},ldata[i][1]));
     lbox.appendChild(lr);
   }
   wCard.appendChild(lbox);
@@ -819,11 +882,12 @@ function renderLedger(c){
 
   // 비비상금/주식 자동계산
   var diffGrid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginTop:"16px"}});
+  var totalHBB=totalAccumulatedHBB(year,month);
 
-  var wBox=h("div",{style:{background:c.hBB>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
-  wBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"4px"}},"👨 남편 비비상금"));
-  wBox.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:c.hBB>=0?"#0F9648":"#F04452"}},fmt(c.hBB)));
-  if(c.hT>0) wBox.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1"}},fmtPct(c.hBB/c.hT*100)));
+  var wBox=h("div",{style:{background:totalHBB>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
+  wBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"4px"}},"💰 총 비비상금 (누적)"));
+  wBox.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:totalHBB>=0?"#0F9648":"#F04452"}},fmt(totalHBB)));
+  wBox.appendChild(h("div",{style:{fontSize:"11px",color:"#ADB5BD",marginTop:"2px"}},"이번 달 "+fmt(c.hBB)));
 
   var hBox=h("div",{style:{background:c.hSav0>=0?"#E8FAF0":"#FEF0F1",borderRadius:"12px",padding:"14px"}});
   hBox.appendChild(h("div",{style:{fontSize:"13px",color:"#6B7684",marginBottom:"4px"}},"📈 주식 (자동계산)"));
@@ -1049,7 +1113,7 @@ function renderSettings(c){
   loanCard.appendChild(lHdr);
   loanCard.appendChild(loanField("대출 금리 (%)","rate","%"));
   loanCard.appendChild(loanField("현재 대출잔금","baseBalance","원"));
-  loanCard.appendChild(loanField("월 상환금","monthlyPayment","원"));
+  loanCard.appendChild(h("div",{style:{fontSize:"12px",color:"#B0B8C1",marginTop:"-8px",marginBottom:"14px",lineHeight:"1.6"}},"💡 대출잔금을 수정하면, 반영 시점(이번 달) 이전 달들의 잔금에는 영향을 주지 않고 이후 달부터만 새 금액 기준으로 계산돼요. 월 상환금은 가계부 작성 페이지의 '아내 → 적금' 항목에서 입력해요."));
   loanCard.appendChild(atBox);
   loanCard.appendChild(h("div",{style:{
     fontSize:"13px",color:"#8B95A1",lineHeight:"1.7",
@@ -1100,6 +1164,23 @@ function renderSettings(c){
         }
       }
     }
+    // 대출잔금이 바뀌면, 그 변경은 "지금 이 시점"부터만 적용되도록 기준월(anchor)을 오늘로 재설정한다.
+    // (예: 2026-06 에 대출잔금을 수정하면 2026-06 이전 달의 계산에는 영향이 없고, 2026-06부터 새 금액 기준으로 계산됨)
+    var oldLoanForReset=s.settings.loan||LOAN_BASE;
+    if(Number(lLocal.baseBalance)!==Number(oldLoanForReset.baseBalance)){
+      var todayK=getKST(),ty=todayK.getFullYear(),tm=todayK.getMonth();
+      var prevChain=calcLoan(oldLoanForReset,ty,tm,s.allData);
+      var newInst=prevChain?prevChain.installment:oldLoanForReset.startInstallment;
+      var rNow=Number(lLocal.rate)/100/12;
+      var newBal=Number(lLocal.baseBalance);
+      var newIntr=Math.round(newBal*rNow);
+      var payForCalc=N(lLocal.monthlyPayment,oldLoanForReset.monthlyPayment);
+      var newPrin=Math.round(payForCalc-newIntr);
+      lLocal.baseMonth={year:ty,month:tm};
+      lLocal.startInstallment=newInst;
+      lLocal.baseInterest=newIntr;
+      lLocal.basePrincipal=newPrin;
+    }
     var newLoan={};
     for(k2 in lLocal) newLoan[k2]=lLocal[k2];
 
@@ -1109,10 +1190,7 @@ function renderSettings(c){
       changes.push({id:Date.now()+Math.random(),item:"대출 금리",date:new Date().toLocaleString("ko-KR"),from:Number(oldLoan.rate),to:Number(lLocal.rate),diff:Number(lLocal.rate)-Number(oldLoan.rate)});
     }
     if(Number(lLocal.baseBalance)!==Number(oldLoan.baseBalance)){
-      changes.push({id:Date.now()+Math.random(),item:"대출 잔금",date:new Date().toLocaleString("ko-KR"),from:Number(oldLoan.baseBalance),to:Number(lLocal.baseBalance),diff:Number(lLocal.baseBalance)-Number(oldLoan.baseBalance)});
-    }
-    if(Number(lLocal.monthlyPayment)!==Number(oldLoan.monthlyPayment)){
-      changes.push({id:Date.now()+Math.random(),item:"월 상환금",date:new Date().toLocaleString("ko-KR"),from:Number(oldLoan.monthlyPayment),to:Number(lLocal.monthlyPayment),diff:Number(lLocal.monthlyPayment)-Number(oldLoan.monthlyPayment)});
+      changes.push({id:Date.now()+Math.random(),item:"대출 잔금",date:new Date().toLocaleString("ko-KR"),from:Number(oldLoan.baseBalance),to:Number(lLocal.baseBalance),diff:Number(lLocal.baseBalance)-Number(oldLoan.baseBalance),note:"이번 달부터 적용 (이전 달 계산엔 영향 없음)"});
     }
     if(lLocal.autoTransferUntil!==oldLoan.autoTransferUntil){
       changes.push({id:Date.now()+Math.random(),item:"자동이체 종료",date:new Date().toLocaleString("ko-KR"),from:0,to:0,diff:null,note:oldLoan.autoTransferUntil+" → "+lLocal.autoTransferUntil});
