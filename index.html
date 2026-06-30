@@ -681,7 +681,7 @@ function renderLedger(c){
     });
     cardEl.appendChild(togBtn);
     if(active){
-      var aInp=h("input",{type:"number",style:{flex:"1",background:"#F2F4F6",border:"1.5px solid #E5E8EB",borderRadius:"10px",color:"#191F28",fontSize:"17px",fontWeight:"700",padding:"12px 14px",outline:"none"},placeholder:"0"});
+      var aInp=h("input",{type:"number",style:{flex:"1",minWidth:"0",width:"1px",boxSizing:"border-box",background:"#F2F4F6",border:"1.5px solid #E5E8EB",borderRadius:"10px",color:"#191F28",fontSize:"17px",fontWeight:"700",padding:"12px 14px",outline:"none"},placeholder:"0"});
       aInp.value=c.md[amtKey]!==undefined?c.md[amtKey]:item.amount;
       aInp.addEventListener("change",function(e){
         var p={};
@@ -1127,7 +1127,6 @@ function renderSettings(c){
   var husCard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",overflow:"hidden"}});
   husCard.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"800",color:"#191F28",marginBottom:"16px"}},"👨 남편 - 항목 설정"));
   husCard.appendChild(buildGroup("husband","incomeToggle","💵","추가 수입"));
-  husCard.appendChild(buildGroup("husband","savings","📈","적금"));
   husCard.appendChild(buildGroup("husband","expenseToggle","💰","기본 지출 (떡값)"));
   husCard.appendChild(buildGroup("husband","expenses","💸","지출"));
 
