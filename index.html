@@ -209,27 +209,52 @@ function compute(){
   var wT=wS+wAddAmt,hT=hS+hAddAmt,totI=wT+hT;
   var li=calcLoan(cfg,year,month);
   var lP=li?li.principal:N(cfg.basePrincipal,0),lI=li?li.interest:N(cfg.baseInterest,0),lB=li?li.balance:N(cfg.baseBalance,0);
-  var evE=getEventExp(year,month),evA=N(g("경조사비_amt",evE.amount),evE.amount);
+  var evE=getEventExp(year,month);
+
+  // ── 설정에 있는 항목 배열을 "지금 실제로 존재하는 항목" 기준으로만 합산.
+  //    항목을 추가/삭제하면 이 함수가 그대로 반영돼서, 화면에 보이는 개별 항목 합계와
+  //    카드에 표시되는 총합이 항상 일치한다.
+  function sumArr(arr,defaultFor){
+    var total=0;
+    (arr||[]).forEach(function(it){
+      var def=defaultFor?defaultFor(it):it.amount;
+      total+=N(g(it.id+"_amt",def),def);
+    });
+    return total;
+  }
+  function amtOf(arr,id,defaultFor){
+    var it=null;
+    (arr||[]).forEach(function(x){if(x.id===id)it=x;});
+    if(!it)return 0;
+    var def=defaultFor?defaultFor(it):it.amount;
+    return N(g(it.id+"_amt",def),def);
+  }
+
   var ws=s.settings.wife.savings||[],we=s.settings.wife.expenses||[];
-  var wSav0=N(g((ws[0]||{id:"도약적금"}).id+"_amt",(ws[0]||{}).amount||500000),(ws[0]||{}).amount||500000);
-  var wExp0=N(g((we[0]||{id:"고정비_나"}).id+"_amt",(we[0]||{}).amount||900000),(we[0]||{}).amount||900000);
-  var wExp1=N(g((we[1]||{id:"용돈_나"}).id+"_amt",(we[1]||{}).amount||300000),(we[1]||{}).amount||300000);
-  var wSavX=ws.slice(1).reduce(function(a,it){return a+N(g(it.id+"_amt",it.amount),it.amount);},0);
-  var wExpX=we.slice(2).reduce(function(a,it){return a+N(g(it.id+"_amt",it.amount),it.amount);},0);
-  var wTS=wSav0+wSavX+lP,wTE=wExp0+wExp1+wExpX+lI,wGO=wTS+wTE,wD=wT-wGO;
+  var wTS=sumArr(ws)+lP;
+  var wTE=sumArr(we)+lI;
+  var wGO=wTS+wTE,wD=wT-wGO;
+
   var hs=s.settings.husband.savings||[],he=s.settings.husband.expenses||[];
-  var hSavX=hs.slice(1).reduce(function(a,it){return a+N(g(it.id+"_amt",it.amount),it.amount);},0);
-  var h비상금=N(g("비상금_amt",150000),150000),h마미=N(g("마미대출_amt",170000),170000),h생활=N(g("생활비_amt",550000),550000),h여행=N(g("여행비_amt",250000),250000),h고정=N(g("고정비_남_amt",362040),362040),h용돈=N(g("용돈_남_amt",160000),160000);
-  var hExpX=he.slice(7).reduce(function(a,it){return a+N(g(it.id+"_amt",it.amount),it.amount);},0);
-  var hTE=h비상금+h마미+evA+h생활+h여행+h고정+h용돈+hExpX+t1a+t2a;
+  // 경조사비는 항목이 존재하는 한, 달마다 자동으로 바뀌는 기본값(getEventExp)을 갖는다.
+  function evDef(it){return it.id==="경조사비"?evE.amount:it.amount;}
+  var hTEnoToggle=sumArr(he,evDef);
+  var evA=amtOf(he,"경조사비",evDef);
+  var hTE=hTEnoToggle+t1a+t2a;
+
+  // 적금의 첫 항목(기본값: 주식)은 "수입 - 지출 - 다른 적금"으로 자동 계산되는 잔여값(plug).
+  // 나머지 적금 항목은 실제 입력값을 그대로 합산한다.
   var hBBa=wAddAmt+hAddAmt;var hBB=N(g("비비상금_남_amt",hBBa),hBBa);
-  var totSOtherThanStock=wTS+hSavX+hBB;
+  var stockItem=hs[0]||null;
+  var hSavRest=stockItem?hs.slice(1):hs;
+  var hSavRestTotal=sumArr(hSavRest);
+  var totSOtherThanStock=wTS+hSavRestTotal+hBB;
   var totEbeforeStock=wTE+hTE;
   var stockDefault=totI-totEbeforeStock-totSOtherThanStock;
-  var hSav0=N(g((hs[0]||{id:"주식"}).id+"_amt",stockDefault),stockDefault);
-  var hTS=hSav0+hSavX+hBB,hGO=hTS+hTE,hD=hT-hGO;
+  var hSav0=stockItem?N(g(stockItem.id+"_amt",stockDefault),stockDefault):stockDefault;
+  var hTS=hSav0+hSavRestTotal+hBB,hGO=hTS+hTE,hD=hT-hGO;
   var totE=wTE+hTE,totS=wTS+hTS;
-  return{mKey:mKey,md:md,g:g,lCfg:cfg,wS:wS,hS:hS,t1:t1,t2:t2,t1a:t1a,t2a:t2a,wInc:wInc,hInc:hInc,wAddActive:wAddActive,wAddAmt:wAddAmt,hAddActive:hAddActive,hAddAmt:hAddAmt,wT:wT,hT:hT,totI:totI,li:li,lP:lP,lI:lI,lB:lB,evE:evE,evA:evA,wSav0:wSav0,wExp0:wExp0,wExp1:wExp1,hSav0:hSav0,stockDefault:stockDefault,h비상금:h비상금,h마미:h마미,h생활:h생활,h여행:h여행,h고정:h고정,h용돈:h용돈,hBBa:hBBa,hBB:hBB,wTS:wTS,wTE:wTE,wGO:wGO,wD:wD,hTS:hTS,hTE:hTE,hGO:hGO,hD:hD,totE:totE,totS:totS};
+  return{mKey:mKey,md:md,g:g,lCfg:cfg,wS:wS,hS:hS,t1:t1,t2:t2,t1a:t1a,t2a:t2a,wInc:wInc,hInc:hInc,wAddActive:wAddActive,wAddAmt:wAddAmt,hAddActive:hAddActive,hAddAmt:hAddAmt,wT:wT,hT:hT,totI:totI,li:li,lP:lP,lI:lI,lB:lB,evE:evE,evA:evA,hSav0:hSav0,stockDefault:stockDefault,hBBa:hBBa,hBB:hBB,wTS:wTS,wTE:wTE,wGO:wGO,wD:wD,hTS:hTS,hTE:hTE,hGO:hGO,hD:hD,totE:totE,totS:totS};
 }
 
 // DOM helper
@@ -771,8 +796,9 @@ function renderLedger(c){
     appendToggleItem(hCard,expTog[i],tak,tamk);
   }
   for(i=0;i<he.length;i++){
-    var hAmt=i===2?c.evA:he[i].amount;
-    var hInfo=i===2?(c.evE?c.evE.detail:"경조사비"):he[i].info||null;
+    var isEventItem=he[i].id==="경조사비";
+    var hAmt=isEventItem?c.evA:he[i].amount;
+    var hInfo=isEventItem?(c.evE?c.evE.detail:"경조사비"):he[i].info||null;
     hCard.appendChild(itemInput(he[i].label,he[i].emoji,hAmt,he[i].id+"_amt",false));
   }
   wrap.appendChild(hCard);
