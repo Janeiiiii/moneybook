@@ -156,6 +156,21 @@ function fmtPct(n){if(!n&&n!==0)return"—";return(Math.round(Number(n)*10)/10).
 function sign(n){return n>=0?"+":"";}
 function N(v,fb){var r=Number(v);return isNaN(r)?fb:r;}
 
+// 항목 추가/삭제 시점 기준으로 특정 연/월에 활성 여부 판단
+// 추가: addedAt 기록된 달부터 보임 / 삭제: removedAt 기록된 달까지 보이고 다음달부터 안보임
+function isItemActive(item,year,month){
+  if(item.addedAt){
+    var da=new Date(item.addedAt);
+    if(!isNaN(da)){var ay=da.getFullYear(),am=da.getMonth();if(year<ay||(year===ay&&month<am))return false;}
+  }
+  if(item.removedAt){
+    var dr=new Date(item.removedAt);
+    if(!isNaN(dr)){var ry=dr.getFullYear(),rm=dr.getMonth();if(year>ry||(year===ry&&month>rm))return false;}
+  }
+  return true;
+}
+function activeItems(arr,year,month){return(arr||[]).filter(function(it){return isItemActive(it,year,month);});}
+
 var LOAN_BASE={rate:3.977,totalInstallments:480,startInstallment:10,baseMonth:{year:2026,month:4},baseBalance:244273746,monthlyPayment:1026286,basePrincipal:216007,baseInterest:810279,autoTransferUntil:"2027.09"};
 function calcLoan(cfg,year,month,allData){
   var base=cfg||LOAN_BASE;
@@ -228,14 +243,14 @@ function compute(yArg,mArg){
   var s=STATE,year=(yArg!==undefined?yArg:s.year),month=(mArg!==undefined?mArg:s.month),mKey=year+"-"+month,md=s.allData[mKey]||{},cfg=s.settings.loan||LOAN_BASE;
   function g(f,fb){return md[f]!==undefined?md[f]:fb;}
   var wS=N(g("wifeSalary",0),0),hS=N(g("husbandSalary",0),0);
-  var exTog=s.settings.husband.expenseToggle||[];
+  var exTog=activeItems(s.settings.husband.expenseToggle,year,month);
   var t1=g("tteok1Active",false),t2=g("tteok2Active",false);
   var t1a=t1?N(g("tteok1Amt",(exTog[0]||{}).amount||0),(exTog[0]||{}).amount||0):0;
   var t2a=t2?N(g("tteok2Amt",(exTog[1]||{}).amount||0),(exTog[1]||{}).amount||0):0;
-  var wInc=(s.settings.wife.incomeToggle||[])[0]||{id:"추가수입_아내",amount:0};
-  var hInc=(s.settings.husband.incomeToggle||[])[0]||{id:"추가수입_남편",amount:0};
-  var wAddActive=g(wInc.id+"_active",false),wAddAmt=wAddActive?N(g(wInc.id+"_amt",wInc.amount),wInc.amount):0;
-  var hAddActive=g(hInc.id+"_active",false),hAddAmt=hAddActive?N(g(hInc.id+"_amt",hInc.amount),hInc.amount):0;
+  var wInc=activeItems(s.settings.wife.incomeToggle,year,month)[0]||null;
+  var hInc=activeItems(s.settings.husband.incomeToggle,year,month)[0]||null;
+  var wAddActive=wInc?g(wInc.id+"_active",false):false,wAddAmt=(wInc&&wAddActive)?N(g(wInc.id+"_amt",wInc.amount),wInc.amount):0;
+  var hAddActive=hInc?g(hInc.id+"_active",false):false,hAddAmt=(hInc&&hAddActive)?N(g(hInc.id+"_amt",hInc.amount),hInc.amount):0;
   var wT=wS+wAddAmt,hT=hS+hAddAmt,totI=wT+hT;
   // 주담대: 가계부 작성 페이지의 월상환금_amt/납부원금_amt/대출이자_amt 수기 입력이 있으면
   // 그 값을 그대로 쓰고, 없으면 설정의 기준값을 토대로 자동계산한다. (calcLoan이 누적 처리)
@@ -243,6 +258,12 @@ function compute(yArg,mArg){
   var lPay=li?li.monthlyPayment:N(cfg.monthlyPayment,0);
   var lP=li?li.principal:N(cfg.basePrincipal,0),lI=li?li.interest:N(cfg.baseInterest,0),lB=li?li.balance:N(cfg.baseBalance,0);
   var evE=getEventExp(year,month);
+
+  // ── 월별 임시 추가 항목 파싱
+  function parseExtra(key){try{var v=g(key,null);return v?JSON.parse(v):[];}catch(e){return[];}}
+  function extraSum(arr,cat){return(arr||[]).filter(function(e){return e.autoCalc&&e.category===cat;}).reduce(function(a,e){return a+N(e.amount,0);},0);}
+  var wExtra=parseExtra("extraItems_wife");
+  var hExtra=parseExtra("extraItems_husband");
 
   // ── 설정에 있는 항목 배열을 "지금 실제로 존재하는 항목" 기준으로만 합산.
   //    항목을 추가/삭제하면 이 함수가 그대로 반영돼서, 화면에 보이는 개별 항목 합계와
@@ -263,31 +284,33 @@ function compute(yArg,mArg){
     return N(g(it.id+"_amt",def),def);
   }
 
-  var ws=s.settings.wife.savings||[],we=s.settings.wife.expenses||[];
-  var wTS=sumArr(ws)+lP;
-  var wTE=sumArr(we)+lI;
-  var wGO=wTS+wTE,wD=wT-wGO;
+  var ws=activeItems(s.settings.wife.savings,year,month),we=activeItems(s.settings.wife.expenses,year,month);
+  var wTS=sumArr(ws)+lP+extraSum(wExtra,"saving");
+  var wTE=sumArr(we)+lI+extraSum(wExtra,"expense");
+  var wTadj=wT+extraSum(wExtra,"income");
+  var wGO=wTS+wTE,wD=wTadj-wGO;
 
-  var hs=s.settings.husband.savings||[],he=s.settings.husband.expenses||[];
+  var hs=s.settings.husband.savings||[],he=activeItems(s.settings.husband.expenses,year,month);
   // 경조사비는 항목이 존재하는 한, 달마다 자동으로 바뀌는 기본값(getEventExp)을 갖는다.
   function evDef(it){return it.id==="경조사비"?evE.amount:it.amount;}
-  var hTEnoToggle=sumArr(he,evDef);
+  var hTEnoToggle=sumArr(he,evDef)+extraSum(hExtra,"expense");
   var evA=amtOf(he,"경조사비",evDef);
   var hTE=hTEnoToggle+t1a+t2a;
 
   // 적금의 첫 항목(기본값: 주식)은 "수입 - 지출 - 다른 적금"으로 자동 계산되는 잔여값(plug).
-  // 나머지 적금 항목은 실제 입력값을 그대로 합산한다.
   var hBBa=wAddAmt+hAddAmt;var hBB=N(g("비비상금_남_amt",hBBa),hBBa);
   var stockItem=hs[0]||null;
   var hSavRest=stockItem?hs.slice(1):hs;
-  var hSavRestTotal=sumArr(hSavRest);
+  var hSavRestTotal=sumArr(hSavRest)+extraSum(hExtra,"saving");
+  var hTadj=hT+extraSum(hExtra,"income");
+  var totIadj=wTadj+hTadj;
   var totSOtherThanStock=wTS+hSavRestTotal+hBB;
   var totEbeforeStock=wTE+hTE;
-  var stockDefault=totI-totEbeforeStock-totSOtherThanStock;
+  var stockDefault=totIadj-totEbeforeStock-totSOtherThanStock;
   var hSav0=stockItem?N(g(stockItem.id+"_amt",stockDefault),stockDefault):stockDefault;
-  var hTS=hSav0+hSavRestTotal+hBB,hGO=hTS+hTE,hD=hT-hGO;
+  var hTS=hSav0+hSavRestTotal+hBB,hGO=hTS+hTE,hD=hTadj-hGO;
   var totE=wTE+hTE,totS=wTS+hTS;
-  return{year:year,month:month,mKey:mKey,md:md,g:g,lCfg:cfg,wS:wS,hS:hS,t1:t1,t2:t2,t1a:t1a,t2a:t2a,wInc:wInc,hInc:hInc,wAddActive:wAddActive,wAddAmt:wAddAmt,hAddActive:hAddActive,hAddAmt:hAddAmt,wT:wT,hT:hT,totI:totI,li:li,lPay:lPay,lP:lP,lI:lI,lB:lB,evE:evE,evA:evA,hSav0:hSav0,stockDefault:stockDefault,hBBa:hBBa,hBB:hBB,wTS:wTS,wTE:wTE,wGO:wGO,wD:wD,hTS:hTS,hTE:hTE,hGO:hGO,hD:hD,totE:totE,totS:totS};
+  return{year:year,month:month,mKey:mKey,md:md,g:g,lCfg:cfg,wS:wS,hS:hS,t1:t1,t2:t2,t1a:t1a,t2a:t2a,wInc:wInc,hInc:hInc,wAddActive:wAddActive,wAddAmt:wAddAmt,hAddActive:hAddActive,hAddAmt:hAddAmt,wT:wTadj,hT:hTadj,totI:totIadj,wExtra:wExtra,hExtra:hExtra,li:li,lPay:lPay,lP:lP,lI:lI,lB:lB,evE:evE,evA:evA,hSav0:hSav0,stockDefault:stockDefault,hBBa:hBBa,hBB:hBB,wTS:wTS,wTE:wTE,wGO:wGO,wD:wD,hTS:hTS,hTE:hTE,hGO:hGO,hD:hD,totE:totE,totS:totS};
 }
 // 총 비비상금: 현재까지 기록된(또는 진행중인) 매월의 남편 비비상금 값을 모두 더한 누적 합계
 function totalAccumulatedHBB(uptoYear,uptoMonth){
@@ -556,12 +579,21 @@ function renderDashboard(c){
   function detailRow(label,val,col){return h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #F2F4F6"}},h("span",{style:{fontSize:"15px",color:"#6B7684"}}),h("span",{style:{fontSize:"15px",fontWeight:"600",color:col||"#191F28"}},val));}
 
   // Wife details
-  var ws=s.settings.wife.savings||[]; var we=s.settings.wife.expenses||[];
+  var ws=activeItems(s.settings.wife.savings,year,month); var we=activeItems(s.settings.wife.expenses,year,month);
   var wifeDtl=h("div",null);
   function addSub(label,col){var el=h("div",{style:{fontSize:"13px",fontWeight:"700",color:"#8B95A1",marginBottom:"4px",marginTop:"12px"}});el.textContent=label;wifeDtl.appendChild(el);}
   function addRow(lbl,val,col){var el=detailRow(lbl,val,col);el.children[0].textContent=lbl;wifeDtl.appendChild(el);}
+  // 아내 Summary 카드
+  var wSumGrid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",margin:"0 0 12px"}});
+  [["💰 총 수입",c.wT,"#3182F6"],["💸 총 지출",c.wTE,"#F04452"],["📈 총 적금",c.wTS,"#1CD66B"],["🏦 잔고",c.wD,c.wD>=0?"#0F9648":"#F04452"]].forEach(function(si){
+    wSumGrid.appendChild(h("div",{style:{background:"#F9FAFB",borderRadius:"10px",padding:"10px 12px"}},
+      h("div",{style:{fontSize:"11px",color:"#8B95A1",marginBottom:"3px",fontWeight:"500"}},si[0]),
+      h("div",{style:{fontSize:"14px",fontWeight:"800",color:si[2]}},fmt(si[1]))
+    ));
+  });
+  wifeDtl.appendChild(wSumGrid);
   addSub("수입"); addRow("월급",fmt(c.wS));
-  if(c.wAddActive) addRow(" ↳ "+c.wInc.label,fmt(c.wAddAmt));
+  if(c.wAddActive&&c.wInc) addRow(" ↳ "+c.wInc.label,fmt(c.wAddAmt));
   addSub("적금"); addRow("적금 합계",fmt(c.wTS),"#1CD66B");
   ws.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRow(" ↳ "+it.label,fmt(a));});
   addRow(" ↳ 대출 원금",fmt(c.lP));
@@ -571,12 +603,12 @@ function renderDashboard(c){
   addSub("🏠 주택담보대출"); addRow("월 상환금",fmt(c.lPay)); addRow("대출 원금",fmt(c.lP)); addRow("대출 이자",fmt(c.lI)); addRow("대출잔금",fmt(c.lB),"#F04452");
 
   // Husband details
-  var hs=s.settings.husband.savings||[]; var he=s.settings.husband.expenses||[]; var exTog=s.settings.husband.expenseToggle||[];
+  var hs=s.settings.husband.savings||[]; var he=activeItems(s.settings.husband.expenses,year,month); var exTog=activeItems(s.settings.husband.expenseToggle,year,month);
   var husDtl=h("div",null);
   function addSubH(label){var el=h("div",{style:{fontSize:"13px",fontWeight:"700",color:"#8B95A1",marginBottom:"4px",marginTop:"12px"}});el.textContent=label;husDtl.appendChild(el);}
   function addRowH(lbl,val,col){var el=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #F2F4F6"}},h("span",{style:{fontSize:"15px",color:"#6B7684"}},lbl),h("span",{style:{fontSize:"15px",fontWeight:"600",color:col||"#191F28"}},val));husDtl.appendChild(el);}
   addSubH("수입"); addRowH("월급",fmt(c.hS));
-  if(c.hAddActive) addRowH(" ↳ "+c.hInc.label,fmt(c.hAddAmt));
+  if(c.hAddActive&&c.hInc) addRowH(" ↳ "+c.hInc.label,fmt(c.hAddAmt));
   addSubH("적금"); addRowH("적금 합계",fmt(c.hTS),"#1CD66B");
   hs.forEach(function(it,idx){var a=idx===0?c.hSav0:N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRowH(" ↳ "+it.label,fmt(a));});
   addRowH(" ↳ 비비상금",fmt(c.hBB));
@@ -584,6 +616,27 @@ function renderDashboard(c){
   if(c.t1) addRowH(" ↳ "+(exTog[0]||{label:"떡값1"}).label,fmt(c.t1a));
   if(c.t2) addRowH(" ↳ "+(exTog[1]||{label:"떡값2"}).label,fmt(c.t2a));
   he.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRowH(" ↳ "+it.label,fmt(a));});
+
+  // 이번달 합산 (남편 내역 아래)
+  var totSumEl=h("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"2px solid #F2F4F6"}});
+  totSumEl.appendChild(h("div",{style:{fontSize:"15px",fontWeight:"800",color:"#191F28",marginBottom:"10px"}},"📊 이번달 합산"));
+  [[c.totI,"💰 합산 수입","#3182F6"],[c.totE,"💸 합산 지출","#F04452"],[c.totS,"📈 합산 적금","#1CD66B"]].forEach(function(td){
+    var tr=h("div",{style:{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #F2F4F6"}});
+    tr.appendChild(h("span",{style:{fontSize:"14px",color:"#6B7684"}},td[1]));
+    var pct=c.totI>0?" ("+fmtPct(td[0]/c.totI*100)+")":"";
+    tr.appendChild(h("span",{style:{fontSize:"14px",fontWeight:"700",color:td[2]}},fmt(td[0])+pct));
+    totSumEl.appendChild(tr);
+  });
+  var miniGrid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginTop:"10px"}});
+  var bb2=h("div",{style:{background:c.hBB>=0?"#E8FAF0":"#FEF0F1",borderRadius:"10px",padding:"10px 12px"}});
+  bb2.appendChild(h("div",{style:{fontSize:"11px",color:"#6B7684",marginBottom:"3px"}},"💰 비비상금 (이번달)"));
+  bb2.appendChild(h("div",{style:{fontSize:"14px",fontWeight:"800",color:c.hBB>=0?"#0F9648":"#F04452"}},fmt(c.hBB)));
+  var st2=h("div",{style:{background:c.hSav0>=0?"#E8FAF0":"#FEF0F1",borderRadius:"10px",padding:"10px 12px"}});
+  st2.appendChild(h("div",{style:{fontSize:"11px",color:"#6B7684",marginBottom:"3px"}},"📈 주식 (자동계산)"));
+  st2.appendChild(h("div",{style:{fontSize:"14px",fontWeight:"800",color:c.hSav0>=0?"#0F9648":"#F04452"}},fmt(c.hSav0)));
+  miniGrid.appendChild(bb2); miniGrid.appendChild(st2);
+  totSumEl.appendChild(miniGrid);
+  husDtl.appendChild(totSumEl);
 
   var mainCard=h("div",{className:"t-card"},
     h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"16px",gap:"8px",flexWrap:"nowrap"}},
@@ -608,6 +661,131 @@ function renderDashboard(c){
 }
 
 /* ── LEDGER */
+// ── 이번달 임시 항목 추가/삭제 (가계부 작성 화면용)
+// person: "wife" | "husband", c: compute 결과, setMD: 저장함수
+function renderExtraItems(cardEl,person,c,setMD){
+  var storeKey="extraItems_"+person;
+  var items=JSON.parse(JSON.stringify(person==="wife"?(c.wExtra||[]):(c.hExtra||[])));
+  var catLabel={income:"💰 수입",saving:"📈 적금",expense:"💸 지출"};
+
+  var section=h("div",{style:{marginTop:"16px",borderTop:"2px dashed #E5E8EB",paddingTop:"14px"}});
+  section.appendChild(h("div",{style:{fontSize:"13px",fontWeight:"700",color:"#8B95A1",marginBottom:"10px"}},"✚ 이번달 추가 항목"));
+
+  var listEl=h("div",null);
+  section.appendChild(listEl);
+
+  function save(arr){
+    var p={};p[storeKey]=JSON.stringify(arr);setMD(p);
+  }
+
+  function renderList(){
+    while(listEl.firstChild) listEl.removeChild(listEl.firstChild);
+    items.forEach(function(item,idx){
+      var row=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px",background:"#F9FAFB",borderRadius:"10px",padding:"10px 12px"}});
+      row.appendChild(h("span",{style:{fontSize:"16px"}},item.emoji||"💰"));
+      var infoCol=h("div",{style:{flex:"1",minWidth:"0"}});
+      infoCol.appendChild(h("div",{style:{fontSize:"13px",fontWeight:"600",color:"#191F28",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},item.label));
+      infoCol.appendChild(h("div",{style:{fontSize:"11px",color:"#8B95A1"}},catLabel[item.category]+(item.autoCalc?" · 합산포함":" · 표시만")));
+      row.appendChild(infoCol);
+      var amtInp=h("input",{type:"number",style:{width:"100px",flexShrink:"0",background:"#fff",border:"1.5px solid #E5E8EB",borderRadius:"8px",fontSize:"14px",fontWeight:"700",color:"#191F28",padding:"6px 8px",outline:"none",textAlign:"right"}});
+      amtInp.value=item.amount||0;
+      (function(ii){
+        amtInp.addEventListener("change",function(e){items[ii].amount=N(e.target.value,0);save(items);});
+      })(idx);
+      row.appendChild(amtInp);
+      row.appendChild(h("span",{style:{fontSize:"12px",color:"#8B95A1",flexShrink:"0"}},"원"));
+      var delBtn=h("button",{style:{flexShrink:"0",width:"30px",height:"30px",background:"#FEF0F1",border:"none",borderRadius:"8px",color:"#F04452",fontSize:"14px",cursor:"pointer"}},"✕");
+      (function(ii){
+        delBtn.addEventListener("click",function(){items.splice(ii,1);save(items);renderList();});
+      })(idx);
+      row.appendChild(delBtn);
+      listEl.appendChild(row);
+    });
+  }
+  renderList();
+
+  // 추가 버튼
+  var addBtn=h("button",{style:{width:"100%",padding:"11px",background:"#fff",border:"1.5px dashed #D1D6DB",borderRadius:"10px",color:"#8B95A1",fontSize:"14px",cursor:"pointer",fontWeight:"500",marginTop:"4px"}},"＋ 이번달 항목 추가");
+  section.appendChild(addBtn);
+
+  // 추가 폼 (처음엔 숨김)
+  var form=h("div",{style:{display:"none",background:"#F2F4F6",borderRadius:"12px",padding:"14px",marginTop:"8px"}});
+  var fLabel=h("input",{type:"text",style:{width:"100%",boxSizing:"border-box",background:"#fff",border:"1.5px solid #E5E8EB",borderRadius:"8px",fontSize:"15px",padding:"9px 12px",outline:"none",marginBottom:"8px"}});
+  fLabel.placeholder="항목명";
+  var fEmoji=h("input",{type:"text",style:{width:"50px",background:"#fff",border:"1.5px solid #E5E8EB",borderRadius:"8px",fontSize:"18px",padding:"8px 6px",outline:"none",textAlign:"center",marginBottom:"8px",marginRight:"8px"}});
+  fEmoji.placeholder="💰";
+  var emojiRow=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}});
+  emojiRow.appendChild(fEmoji);
+  emojiRow.appendChild(h("span",{style:{fontSize:"13px",color:"#8B95A1"}},"이모지"));
+
+  var catBtns=h("div",{style:{display:"flex",gap:"6px",marginBottom:"8px"}});
+  var selectedCat="expense";
+  var catList=[["income","💰 수입"],["saving","📈 적금"],["expense","💸 지출"]];
+  var catElMap={};
+  catList.forEach(function(pair){
+    var cb=h("button",{style:{flex:"1",padding:"8px 4px",borderRadius:"8px",border:"1.5px solid #E5E8EB",background:"#fff",fontSize:"13px",cursor:"pointer",fontWeight:"500",color:"#4E5968"}},pair[1]);
+    catElMap[pair[0]]=cb;
+    cb.addEventListener("click",function(){
+      selectedCat=pair[0];
+      catList.forEach(function(p2){
+        catElMap[p2[0]].style.background=p2[0]===selectedCat?"#3182F6":"#fff";
+        catElMap[p2[0]].style.color=p2[0]===selectedCat?"#fff":"#4E5968";
+        catElMap[p2[0]].style.border="1.5px solid "+(p2[0]===selectedCat?"#3182F6":"#E5E8EB");
+      });
+    });
+    catBtns.appendChild(cb);
+  });
+  catElMap["expense"].style.background="#3182F6";
+  catElMap["expense"].style.color="#fff";
+  catElMap["expense"].style.border="1.5px solid #3182F6";
+
+  var autoCalcRow=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"10px"}});
+  var autoCalcChk=h("input",{type:"checkbox"});
+  autoCalcChk.checked=true;
+  autoCalcRow.appendChild(autoCalcChk);
+  autoCalcRow.appendChild(h("span",{style:{fontSize:"13px",color:"#4E5968"}},"합산에 포함 (총합 자동계산에 반영)"));
+
+  var amtRow2=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"10px"}});
+  var fAmt=h("input",{type:"number",style:{flex:"1",minWidth:"0",background:"#fff",border:"1.5px solid #E5E8EB",borderRadius:"8px",fontSize:"16px",fontWeight:"700",padding:"10px 12px",outline:"none"}});
+  fAmt.placeholder="금액";
+  amtRow2.appendChild(fAmt);
+  amtRow2.appendChild(h("span",{style:{fontSize:"13px",color:"#8B95A1",flexShrink:"0"}},"원"));
+
+  var confirmBtn=h("button",{style:{width:"100%",padding:"12px",background:"#3182F6",border:"none",borderRadius:"10px",color:"#fff",fontSize:"15px",fontWeight:"700",cursor:"pointer"}},
+    "추가하기");
+  confirmBtn.addEventListener("click",function(){
+    var lbl=fLabel.value.trim();
+    if(!lbl){fLabel.focus();return;}
+    items.push({
+      id:"extra_"+Date.now(),
+      label:lbl,
+      emoji:fEmoji.value.trim()||"💰",
+      category:selectedCat,
+      amount:N(fAmt.value,0),
+      autoCalc:autoCalcChk.checked
+    });
+    save(items);
+    renderList();
+    form.style.display="none";
+    fLabel.value="";fEmoji.value="";fAmt.value="";
+    autoCalcChk.checked=true;
+  });
+
+  form.appendChild(fLabel);
+  form.appendChild(emojiRow);
+  form.appendChild(catBtns);
+  form.appendChild(autoCalcRow);
+  form.appendChild(amtRow2);
+  form.appendChild(confirmBtn);
+  section.appendChild(form);
+
+  addBtn.addEventListener("click",function(){
+    form.style.display=form.style.display==="none"?"block":"none";
+  });
+
+  cardEl.appendChild(section);
+}
+
 function renderLedger(c){
   var s=STATE;
   var year=s.year;
@@ -781,16 +959,18 @@ function renderLedger(c){
     return d;
   }
 
+  function hint(txt){return h("div",{style:{fontSize:"11px",color:"#B0B8C1",margin:"-4px 2px 10px",lineHeight:"1.5"}},txt);}
+
   // ── 아내 섹션
   var wCard=h("div",{style:{background:"#fff",borderRadius:"16px",padding:"20px",marginBottom:"10px",boxShadow:"0 1px 6px rgba(0,0,0,0.06)",overflow:"hidden"}});
   wCard.appendChild(h("div",{style:{fontSize:"20px",fontWeight:"800",color:"#191F28",marginBottom:"18px"}},"👩 아내"));
   wCard.appendChild(secHdr("💰","수입",c.wT,0,"#3182F6"));
   wCard.appendChild(salaryInput("월급","wifeSalary",c.md.wifeSalary));
-  var wIncItem=(s.settings.wife.incomeToggle||[])[0]||{id:"추가수입_아내",label:"추가 수입",emoji:"💵",amount:0};
-  appendToggleItem(wCard,wIncItem,wIncItem.id+"_active",wIncItem.id+"_amt");
+  var wIncItem=activeItems(s.settings.wife.incomeToggle,year,month)[0]||null;
+  if(wIncItem) appendToggleItem(wCard,wIncItem,wIncItem.id+"_active",wIncItem.id+"_amt");
 
-  var ws=s.settings.wife.savings||[];
-  var we=s.settings.wife.expenses||[];
+  var ws=activeItems(s.settings.wife.savings,year,month);
+  var we=activeItems(s.settings.wife.expenses,year,month);
   var i;
 
   wCard.appendChild(secHdr("📈","적금",c.wTS,c.wT,"#1CD66B"));
@@ -803,8 +983,7 @@ function renderLedger(c){
     wCard.appendChild(itemInput(we[i].label,we[i].emoji,we[i].amount,we[i].id+"_amt",false));
   }
 
-  // ── 주택담보대출 (대분류) ── 월상환금/대출원금/대출이자를 한데 묶어서 보여주되,
-  // 계산상으로는 대출원금→적금 합계, 대출이자→지출 합계에 그대로 포함된다.
+  // ── 주택담보대출
   var loanHdr=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0 10px",borderBottom:"2px solid #E5E8EB",marginBottom:"4px",marginTop:"4px"}});
   var loanHdrLeft=h("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
   loanHdrLeft.appendChild(h("span",{style:{fontSize:"18px"}},"🏠"));
@@ -818,7 +997,9 @@ function renderLedger(c){
   wCard.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1",margin:"0 2px 10px"}},"자동 계산이 기본값이고 직접 수정도 가능해요 · 대출원금은 적금 합계, 대출이자는 지출 합계에 포함돼요"));
   wCard.appendChild(itemInput("월 상환금","🏦",c.lPay,"월상환금_amt",false));
   wCard.appendChild(itemInput("대출 원금 (적금 합계 포함)","💰",c.lP,"납부원금_amt",true));
+  wCard.appendChild(hint("💡 월상환금 − 대출이자 (자동계산 · 직접 입력 가능)"));
   wCard.appendChild(itemInput("대출 이자 (지출 합계 포함)","💸",c.lI,"대출이자_amt",true));
+  wCard.appendChild(hint("💡 대출잔금 × 금리 ÷ 12 (자동계산 · 직접 입력 가능)"));
 
   // 대출 정보
   var lbox=h("div",{style:{background:"#F9FAFB",borderRadius:"12px",padding:"14px",marginTop:"8px"}});
@@ -830,6 +1011,8 @@ function renderLedger(c){
     lbox.appendChild(lr);
   }
   wCard.appendChild(lbox);
+  // ── 이번달 임시 항목 (아내)
+  renderExtraItems(wCard,"wife",c,setMD);
   wrap.appendChild(wCard);
 
   // ── 남편 섹션
@@ -837,19 +1020,21 @@ function renderLedger(c){
   hCard.appendChild(h("div",{style:{fontSize:"20px",fontWeight:"800",color:"#191F28",marginBottom:"18px"}},"👨 남편"));
   hCard.appendChild(secHdr("💰","수입",c.hT,0,"#3182F6"));
   hCard.appendChild(salaryInput("월급","husbandSalary",c.md.husbandSalary));
-  var hIncItem=(s.settings.husband.incomeToggle||[])[0]||{id:"추가수입_남편",label:"추가 수입",emoji:"💵",amount:0};
-  appendToggleItem(hCard,hIncItem,hIncItem.id+"_active",hIncItem.id+"_amt");
+  var hIncItem=activeItems(s.settings.husband.incomeToggle,year,month)[0]||null;
+  if(hIncItem) appendToggleItem(hCard,hIncItem,hIncItem.id+"_active",hIncItem.id+"_amt");
 
   var hs=s.settings.husband.savings||[];
-  var he=s.settings.husband.expenses||[];
-  var expTog=s.settings.husband.expenseToggle||[];
+  var he=activeItems(s.settings.husband.expenses,year,month);
+  var expTog=activeItems(s.settings.husband.expenseToggle,year,month);
 
   hCard.appendChild(secHdr("📈","적금",c.hTS,c.hT,"#1CD66B"));
   for(i=0;i<hs.length;i++){
     var hSavDef=i===0?c.hSav0:hs[i].amount;
     hCard.appendChild(itemInput(hs[i].label,hs[i].emoji,hSavDef,hs[i].id+"_amt",i===0));
+    if(i===0) hCard.appendChild(hint("💡 합산수입 − 합산지출 − 비비상금 − 기타 적금 (자동계산)"));
   }
   hCard.appendChild(itemInput("비비상금","🔒",c.hBBa,"비비상금_남_amt",true));
+  hCard.appendChild(hint("💡 아내 추가수입 + 남편 추가수입 합산 (자동계산)"));
 
   hCard.appendChild(secHdr("💸","지출",c.hTE,c.hT,"#F04452"));
   // 떡값 토글 (지출)
@@ -861,9 +1046,12 @@ function renderLedger(c){
   for(i=0;i<he.length;i++){
     var isEventItem=he[i].id==="경조사비";
     var hAmt=isEventItem?c.evA:he[i].amount;
-    var hInfo=isEventItem?(c.evE?c.evE.detail:"경조사비"):he[i].info||null;
     hCard.appendChild(itemInput(he[i].label,he[i].emoji,hAmt,he[i].id+"_amt",false));
+    if(isEventItem) hCard.appendChild(hint("📅 ~2026.11: 부모님 용돈+경조사비 / 2026.12~: 부모님 용돈 160만원·경조사비 7만원 별도"));
   }
+
+  // ── 이번달 임시 항목 (남편)
+  renderExtraItems(hCard,"husband",c,setMD);
   wrap.appendChild(hCard);
 
   // ── 합산 카드
@@ -1006,8 +1194,9 @@ function renderSettings(c){
       // Remove all children after header
       while(gWrap.children.length>1) gWrap.removeChild(gWrap.lastChild);
       var i;
-      for(i=0;i<items.length;i++){
-        (function(item,idx){
+      var visItems=items.filter(function(it){return !it.removedAt;});
+      for(i=0;i<visItems.length;i++){
+        (function(item){
           var itemBox=h("div",{style:{background:"#F9FAFB",borderRadius:"12px",padding:"14px 16px",marginBottom:"8px",overflow:"hidden"}});
 
           // Top row: emoji + name + delete button
@@ -1032,9 +1221,10 @@ function renderSettings(c){
             flexShrink:"0",width:"36px",height:"36px",background:"#FEF0F1",
             border:"none",borderRadius:"8px",color:"#F04452",fontSize:"16px",cursor:"pointer"
           }},"✕");
-          (function(ii){
-            delBtn.addEventListener("click",function(){items.splice(ii,1);rebuild();});
-          })(idx);
+          delBtn.addEventListener("click",function(){
+            item.removedAt=new Date().toISOString();
+            rebuild();
+          });
 
           topRow.appendChild(eInp);
           topRow.appendChild(nInp);
@@ -1055,8 +1245,12 @@ function renderSettings(c){
           amtRow.appendChild(h("span",{style:{fontSize:"13px",color:"#8B95A1",flexShrink:"0"}},"원"));
           itemBox.appendChild(amtRow);
 
+          if(item.addedAt){
+            itemBox.appendChild(h("div",{style:{fontSize:"11px",color:"#B0B8C1",marginTop:"6px",lineHeight:"1.5"}},"📅 추가: "+new Date(item.addedAt).toLocaleString("ko-KR")+" · 이번달부터 반영"));
+          }
+
           gWrap.appendChild(itemBox);
-        })(items[i],i);
+        })(visItems[i]);
       }
 
       // Add button
@@ -1066,7 +1260,7 @@ function renderSettings(c){
         color:"#8B95A1",fontSize:"14px",cursor:"pointer",fontWeight:"500"
       }},"＋ 항목 추가");
       addBtn.addEventListener("click",function(){
-        items.push({id:"custom_"+Date.now(),label:"새 항목",emoji:"💰",amount:0});
+        items.push({id:"custom_"+Date.now(),label:"새 항목",emoji:"💰",amount:0,addedAt:new Date().toISOString()});
         rebuild();
       });
       gWrap.appendChild(addBtn);
@@ -1143,8 +1337,15 @@ function renderSettings(c){
           if(oi[oi2].id===nit.id){oit=oi[oi2];break;}
         }
         if(!oit){
-          changes.push({id:Date.now()+Math.random()+"a",item:pname+" - "+nit.label,date:new Date().toLocaleString("ko-KR"),from:0,to:0,diff:null,note:"항목 추가됨 ("+fmt(nit.amount)+")"});
-        } else {
+          // 신규 항목 (addedAt 있음)
+          if(!nit.removedAt){
+            changes.push({id:Date.now()+Math.random()+"a",item:pname+" - "+nit.label,date:new Date().toLocaleString("ko-KR"),from:0,to:0,diff:null,note:"항목 추가됨 ("+fmt(nit.amount)+")"});
+          }
+        } else if(!oit.removedAt&&nit.removedAt){
+          // 이번 저장에서 삭제됨
+          changes.push({id:Date.now()+Math.random()+"e",item:pname+" - "+nit.label,date:new Date().toLocaleString("ko-KR"),from:0,to:0,diff:null,note:"항목 삭제됨"});
+        } else if(!nit.removedAt){
+          // 변경 감지 (삭제되지 않은 항목만)
           if(oit.amount!==nit.amount){
             changes.push({id:Date.now()+Math.random()+"b",item:pname+" - "+nit.label,date:new Date().toLocaleString("ko-KR"),from:oit.amount,to:nit.amount,diff:nit.amount-oit.amount});
           }
@@ -1154,13 +1355,6 @@ function renderSettings(c){
           if(oit.emoji!==nit.emoji){
             changes.push({id:Date.now()+Math.random()+"d",item:pname+" - "+nit.label+" 아이콘 변경",date:new Date().toLocaleString("ko-KR"),from:0,to:0,diff:null,note:(oit.emoji||"")+" → "+(nit.emoji||"")});
           }
-        }
-      }
-      for(var oi3=0;oi3<oi.length;oi3++){
-        var stillExists=false;
-        for(var ni3=0;ni3<ni.length;ni3++){ if(ni[ni3].id===oi[oi3].id){stillExists=true;break;} }
-        if(!stillExists){
-          changes.push({id:Date.now()+Math.random()+"e",item:pname+" - "+oi[oi3].label,date:new Date().toLocaleString("ko-KR"),from:0,to:0,diff:null,note:"항목 삭제됨"});
         }
       }
     }
