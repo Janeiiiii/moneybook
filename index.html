@@ -601,6 +601,10 @@ function renderDashboard(c){
   we.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRow(" ↳ "+it.label,fmt(a));});
   addRow(" ↳ 대출 이자",fmt(c.lI));
   addSub("🏠 주택담보대출"); addRow("월 상환금",fmt(c.lPay)); addRow("대출 원금",fmt(c.lP)); addRow("대출 이자",fmt(c.lI)); addRow("대출잔금",fmt(c.lB),"#F04452");
+  if(c.wExtra&&c.wExtra.length){
+    addSub("✚ 이번달 추가");
+    c.wExtra.forEach(function(ex){addRow(" ↳ "+ex.emoji+" "+ex.label+(ex.autoCalc?" (합산)":" (표시)"),fmt(ex.amount));});
+  }
 
   // Husband details
   var hs=s.settings.husband.savings||[]; var he=activeItems(s.settings.husband.expenses,year,month); var exTog=activeItems(s.settings.husband.expenseToggle,year,month);
@@ -616,6 +620,10 @@ function renderDashboard(c){
   if(c.t1) addRowH(" ↳ "+(exTog[0]||{label:"떡값1"}).label,fmt(c.t1a));
   if(c.t2) addRowH(" ↳ "+(exTog[1]||{label:"떡값2"}).label,fmt(c.t2a));
   he.forEach(function(it){var a=N(c.md[it.id+"_amt"]!==undefined?c.md[it.id+"_amt"]:it.amount,it.amount);addRowH(" ↳ "+it.label,fmt(a));});
+  if(c.hExtra&&c.hExtra.length){
+    addSubH("✚ 이번달 추가");
+    c.hExtra.forEach(function(ex){addRowH(" ↳ "+ex.emoji+" "+ex.label+(ex.autoCalc?" (합산)":" (표시)"),fmt(ex.amount));});
+  }
 
   // 이번달 합산 (남편 내역 아래)
   var totSumEl=h("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"2px solid #F2F4F6"}});
@@ -821,14 +829,21 @@ function renderLedger(c){
   nav.appendChild(nextBtn);
   wrap.appendChild(nav);
 
-  // setMD 함수
+  // ── 드래프트: 저장하기 버튼 누르기 전까지 로컬에만 저장
+  var draft={};
+  (function(){var k;for(k in c.md) draft[k]=c.md[k];})();
+
   function setMD(patch){
+    var k;
+    for(k in patch) draft[k]=patch[k];
+  }
+
+  function saveDraft(){
     var mKey=c.mKey;
     var cur=s.allData[mKey]||{};
-    var nm={};
-    var k;
+    var nm={};var k;
     for(k in cur) nm[k]=cur[k];
-    for(k in patch) nm[k]=patch[k];
+    for(k in draft) nm[k]=draft[k];
     var newAll={};
     for(k in s.allData) newAll[k]=s.allData[k];
     newAll[mKey]=nm;
@@ -917,9 +932,10 @@ function renderLedger(c){
   }
 
   // 섹션 헤더
-  // 토글형 항목 (ON/OFF + 금액) - 떡값, 추가수입 등에서 공용으로 사용
+  // 토글형 항목 (ON/OFF + 금액) - 리렌더 없이 자체 시각 상태 업데이트
   function appendToggleItem(cardEl,item,activeKey,amtKey){
-    var active=c.md[activeKey]||false;
+    var active=!!(draft[activeKey]!==undefined?draft[activeKey]:false);
+
     var togBtn=h("button",{style:{
       width:"100%",padding:"13px 16px",borderRadius:"12px",
       border:"1.5px solid "+(active?"#3182F6":"#E5E8EB"),
@@ -930,29 +946,36 @@ function renderLedger(c){
       display:"flex",justifyContent:"space-between"
     }});
     togBtn.appendChild(h("span",null,item.emoji+" "+item.label));
-    togBtn.appendChild(h("span",{style:{fontSize:"13px",fontWeight:"700"}},active?"ON ✓":"OFF"));
+    var togLabel=h("span",{style:{fontSize:"13px",fontWeight:"700"}},active?"ON ✓":"OFF");
+    togBtn.appendChild(togLabel);
+
     if(item.info){
       cardEl.appendChild(h("div",{style:{fontSize:"12px",color:"#8B95A1",marginTop:"2px",marginBottom:"4px"}},item.info));
     }
-    togBtn.addEventListener("click",function(){
-      var p={};
-      p[activeKey]=!active;
-      setMD(p);
-    });
-    cardEl.appendChild(togBtn);
-    if(active){
-      var aInp=h("input",{type:"number",style:{flex:"1",minWidth:"0",width:"1px",boxSizing:"border-box",background:"#F2F4F6",border:"1.5px solid #E5E8EB",borderRadius:"10px",color:"#191F28",fontSize:"17px",fontWeight:"700",padding:"12px 14px",outline:"none"},placeholder:"0"});
-      aInp.value=c.md[amtKey]!==undefined?c.md[amtKey]:item.amount;
+
+    var amtRow=h("div",{style:{display:active?"flex":"none",alignItems:"center",gap:"8px",marginBottom:"8px"}});
+    var aInp=h("input",{type:"number",style:{flex:"1",minWidth:"0",width:"1px",boxSizing:"border-box",background:"#F2F4F6",border:"1.5px solid #E5E8EB",borderRadius:"10px",color:"#191F28",fontSize:"17px",fontWeight:"700",padding:"12px 14px",outline:"none"},placeholder:"0"});
+    aInp.value=draft[amtKey]!==undefined?draft[amtKey]:item.amount;
+    (function(ak){
       aInp.addEventListener("change",function(e){
-        var p={};
-        p[amtKey]=e.target.value;
-        setMD(p);
+        var p={};p[ak]=e.target.value;setMD(p);
       });
-      var aRow=h("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}});
-      aRow.appendChild(aInp);
-      aRow.appendChild(h("span",{style:{fontSize:"15px",color:"#8B95A1"}},"원"));
-      cardEl.appendChild(aRow);
-    }
+    })(amtKey);
+    amtRow.appendChild(aInp);
+    amtRow.appendChild(h("span",{style:{fontSize:"15px",color:"#8B95A1"}},"원"));
+
+    togBtn.addEventListener("click",function(){
+      active=!active;
+      togBtn.style.border="1.5px solid "+(active?"#3182F6":"#E5E8EB");
+      togBtn.style.background=active?"#EBF3FE":"#F9FAFB";
+      togBtn.style.color=active?"#3182F6":"#4E5968";
+      togLabel.textContent=active?"ON ✓":"OFF";
+      amtRow.style.display=active?"flex":"none";
+      var p={};p[activeKey]=active;setMD(p);
+    });
+
+    cardEl.appendChild(togBtn);
+    cardEl.appendChild(amtRow);
   }
   function secHdr(icon,title,total,income,col){
     var d=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0 10px",borderBottom:"2px solid #E5E8EB",marginBottom:"12px",marginTop:"4px"}});
@@ -1094,6 +1117,21 @@ function renderLedger(c){
   diffGrid.appendChild(hBox);
   totCard.appendChild(diffGrid);
   wrap.appendChild(totCard);
+
+  // ── 저장하기 버튼
+  var saveBtn=h("button",{style:{
+    width:"100%",padding:"16px",background:"#3182F6",border:"none",
+    borderRadius:"14px",color:"#fff",fontSize:"17px",fontWeight:"800",
+    cursor:"pointer",marginTop:"4px",marginBottom:"20px",
+    boxShadow:"0 4px 12px rgba(49,130,246,0.35)"
+  }},"💾 저장하기");
+  saveBtn.addEventListener("click",function(){
+    saveDraft();
+    saveBtn.textContent="✓ 저장됨";
+    saveBtn.style.background="#1CD66B";
+    setTimeout(function(){saveBtn.textContent="💾 저장하기";saveBtn.style.background="#3182F6";},1800);
+  });
+  wrap.appendChild(saveBtn);
 
   // 저장 버튼
   var btnBg=s.syncStatus==="saved"?"#0F9648":s.syncStatus==="saving"?"#ADB5BD":s.syncStatus==="error"?"#F04452":"#3182F6";
