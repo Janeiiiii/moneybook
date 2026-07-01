@@ -751,8 +751,14 @@ function renderExtraItems(cardEl,person,c,setMD){
   amtRow2.appendChild(fAmt);
   amtRow2.appendChild(h("span",{style:{fontSize:"13px",color:"#8B95A1",flexShrink:"0"}},"원"));
 
-  var confirmBtn=h("button",{style:{width:"100%",padding:"12px",background:"#3182F6",border:"none",borderRadius:"10px",color:"#fff",fontSize:"15px",fontWeight:"700",cursor:"pointer"}},
-    "추가하기");
+  var btnRow=h("div",{style:{display:"flex",gap:"8px"}});
+  var cancelBtn=h("button",{style:{flex:"1",padding:"12px",background:"#F2F4F6",border:"none",borderRadius:"10px",color:"#4E5968",fontSize:"15px",fontWeight:"700",cursor:"pointer"}},"취소");
+  cancelBtn.addEventListener("click",function(){
+    form.style.display="none";
+    fLabel.value="";fEmoji.value="";fAmt.value="";
+    autoCalcChk.checked=true;
+  });
+  var confirmBtn=h("button",{style:{flex:"1",padding:"12px",background:"#3182F6",border:"none",borderRadius:"10px",color:"#fff",fontSize:"15px",fontWeight:"700",cursor:"pointer"}},"추가하기");
   confirmBtn.addEventListener("click",function(){
     var lbl=fLabel.value.trim();
     if(!lbl){fLabel.focus();return;}
@@ -771,12 +777,14 @@ function renderExtraItems(cardEl,person,c,setMD){
     autoCalcChk.checked=true;
   });
 
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(confirmBtn);
   form.appendChild(fLabel);
   form.appendChild(emojiRow);
   form.appendChild(catBtns);
   form.appendChild(autoCalcRow);
   form.appendChild(amtRow2);
-  form.appendChild(confirmBtn);
+  form.appendChild(btnRow);
   section.appendChild(form);
 
   addBtn.addEventListener("click",function(){
