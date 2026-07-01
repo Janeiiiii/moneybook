@@ -1118,27 +1118,12 @@ function renderLedger(c){
   totCard.appendChild(diffGrid);
   wrap.appendChild(totCard);
 
-  // ── 저장하기 버튼
-  var saveBtn=h("button",{style:{
-    width:"100%",padding:"16px",background:"#3182F6",border:"none",
-    borderRadius:"14px",color:"#fff",fontSize:"17px",fontWeight:"800",
-    cursor:"pointer",marginTop:"4px",marginBottom:"20px",
-    boxShadow:"0 4px 12px rgba(49,130,246,0.35)"
-  }},"💾 저장하기");
-  saveBtn.addEventListener("click",function(){
-    saveDraft();
-    saveBtn.textContent="✓ 저장됨";
-    saveBtn.style.background="#1CD66B";
-    setTimeout(function(){saveBtn.textContent="💾 저장하기";saveBtn.style.background="#3182F6";},1800);
-  });
-  wrap.appendChild(saveBtn);
-
   // 저장 버튼
   var btnBg=s.syncStatus==="saved"?"#0F9648":s.syncStatus==="saving"?"#ADB5BD":s.syncStatus==="error"?"#F04452":"#3182F6";
   var btnLabel=s.syncStatus==="saved"?"✅ 저장됐어요!":s.syncStatus==="saving"?"⏳ 저장 중...":s.syncStatus==="error"?"❌ 오류 발생":"💾 저장하기";
   var saveBtn=h("button",{style:{display:"block",width:"100%",padding:"17px",border:"none",borderRadius:"14px",fontSize:"17px",fontWeight:"700",cursor:"pointer",color:"#fff",background:btnBg,marginBottom:"20px"}},btnLabel);
   saveBtn.addEventListener("click",function(){
-    // Always read FRESH data from STATE at time of save
+    // draft(로컬 편집값) + 최신 STATE 합산 후 Firebase 저장
     var s2=STATE;
     var c2=compute();
     var mKey2=c2.mKey;
@@ -1146,15 +1131,14 @@ function renderLedger(c){
     var snap={};
     var k;
     for(k in freshMd) snap[k]=freshMd[k];
+    for(k in draft) snap[k]=draft[k];  // draft 덮어쓰기
     snap._totalExpenses=c2.totE;
     snap._totalSavings=c2.totS;
     snap._totalIncome=c2.totI;
     setS({syncStatus:"saving"});
     var payload={};
     payload[mKey2]=snap;
-    console.log("Saving to Firebase:", mKey2, JSON.stringify(snap).slice(0,100));
     fbSet("allData",payload).then(function(ok){
-      console.log("Firebase save result:", ok);
       setS({syncStatus:ok?"saved":"error"});
       setTimeout(function(){setS({syncStatus:"idle"});},2500);
     });
