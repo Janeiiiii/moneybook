@@ -671,9 +671,9 @@ function renderDashboard(c){
 /* ── LEDGER */
 // ── 이번달 임시 항목 추가/삭제 (가계부 작성 화면용)
 // person: "wife" | "husband", c: compute 결과, setMD: 저장함수
-function renderExtraItems(cardEl,person,c,setMD){
-  var storeKey="extraItems_"+person;
-  var items=JSON.parse(JSON.stringify(person==="wife"?(c.wExtra||[]):(c.hExtra||[])));
+function renderExtraItems(cardEl,person,items){
+  // items는 renderLedger에서 전달된 참조(reference) - 변경시 그대로 반영됨
+  // setMD/Firebase 호출 없음 - 저장버튼 클릭시에만 저장됨
   var catLabel={income:"💰 수입",saving:"📈 적금",expense:"💸 지출"};
 
   var section=h("div",{style:{marginTop:"16px",borderTop:"2px dashed #E5E8EB",paddingTop:"14px"}});
@@ -681,10 +681,6 @@ function renderExtraItems(cardEl,person,c,setMD){
 
   var listEl=h("div",null);
   section.appendChild(listEl);
-
-  function save(arr){
-    var p={};p[storeKey]=JSON.stringify(arr);setMD(p);
-  }
 
   function renderList(){
     while(listEl.firstChild) listEl.removeChild(listEl.firstChild);
@@ -698,13 +694,13 @@ function renderExtraItems(cardEl,person,c,setMD){
       var amtInp=h("input",{type:"number",style:{width:"100px",flexShrink:"0",background:"#fff",border:"1.5px solid #E5E8EB",borderRadius:"8px",fontSize:"14px",fontWeight:"700",color:"#191F28",padding:"6px 8px",outline:"none",textAlign:"right"}});
       amtInp.value=item.amount||0;
       (function(ii){
-        amtInp.addEventListener("change",function(e){items[ii].amount=N(e.target.value,0);save(items);});
+        amtInp.addEventListener("change",function(e){items[ii].amount=N(e.target.value,0);});
       })(idx);
       row.appendChild(amtInp);
       row.appendChild(h("span",{style:{fontSize:"12px",color:"#8B95A1",flexShrink:"0"}},"원"));
       var delBtn=h("button",{style:{flexShrink:"0",width:"30px",height:"30px",background:"#FEF0F1",border:"none",borderRadius:"8px",color:"#F04452",fontSize:"14px",cursor:"pointer"}},"✕");
       (function(ii){
-        delBtn.addEventListener("click",function(){items.splice(ii,1);save(items);renderList();});
+        delBtn.addEventListener("click",function(){items.splice(ii,1);renderList();});
       })(idx);
       row.appendChild(delBtn);
       listEl.appendChild(row);
@@ -778,7 +774,6 @@ function renderExtraItems(cardEl,person,c,setMD){
       amount:N(fAmt.value,0),
       autoCalc:autoCalcChk.checked
     });
-    save(items);
     renderList();
     form.style.display="none";
     fLabel.value="";fEmoji.value="";fAmt.value="";
@@ -1042,8 +1037,9 @@ function renderLedger(c){
     lbox.appendChild(lr);
   }
   wCard.appendChild(lbox);
-  // ── 이번달 임시 항목 (아내)
-  renderExtraItems(wCard,"wife",c,setMD);
+  // ── 이번달 임시 항목 (아내) - 배열 참조로 관리, 저장버튼에서만 Firebase 반영
+  var wExtraItems=JSON.parse(JSON.stringify(c.wExtra||[]));
+  renderExtraItems(wCard,"wife",wExtraItems);
   wrap.appendChild(wCard);
 
   // ── 남편 섹션
@@ -1081,8 +1077,9 @@ function renderLedger(c){
     if(isEventItem) hCard.appendChild(hint("📅 ~2026.11: 부모님 용돈+경조사비 / 2026.12~: 부모님 용돈 160만원·경조사비 7만원 별도"));
   }
 
-  // ── 이번달 임시 항목 (남편)
-  renderExtraItems(hCard,"husband",c,setMD);
+  // ── 이번달 임시 항목 (남편) - 배열 참조로 관리
+  var hExtraItems=JSON.parse(JSON.stringify(c.hExtra||[]));
+  renderExtraItems(hCard,"husband",hExtraItems);
   wrap.appendChild(hCard);
 
   // ── 합산 카드
@@ -1123,7 +1120,9 @@ function renderLedger(c){
   var btnLabel=s.syncStatus==="saved"?"✅ 저장됐어요!":s.syncStatus==="saving"?"⏳ 저장 중...":s.syncStatus==="error"?"❌ 오류 발생":"💾 저장하기";
   var saveBtn=h("button",{style:{display:"block",width:"100%",padding:"17px",border:"none",borderRadius:"14px",fontSize:"17px",fontWeight:"700",cursor:"pointer",color:"#fff",background:btnBg,marginBottom:"20px"}},btnLabel);
   saveBtn.addEventListener("click",function(){
-    // draft(로컬 편집값) + 최신 STATE 합산 후 Firebase 저장
+    // wExtraItems/hExtraItems(로컬 배열) + draft(입력값) + STATE 최신 데이터 합산 후 Firebase 저장
+    draft["extraItems_wife"]=JSON.stringify(wExtraItems);
+    draft["extraItems_husband"]=JSON.stringify(hExtraItems);
     var s2=STATE;
     var c2=compute();
     var mKey2=c2.mKey;
@@ -1131,7 +1130,7 @@ function renderLedger(c){
     var snap={};
     var k;
     for(k in freshMd) snap[k]=freshMd[k];
-    for(k in draft) snap[k]=draft[k];  // draft 덮어쓰기
+    for(k in draft) snap[k]=draft[k];
     snap._totalExpenses=c2.totE;
     snap._totalSavings=c2.totS;
     snap._totalIncome=c2.totI;
