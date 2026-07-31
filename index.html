@@ -241,7 +241,7 @@ function mergeS(d){try{var s=JSON.parse(JSON.stringify(DEFAULT_SETTINGS));if(d.w
 
 function compute(yArg,mArg){
   var s=STATE,year=(yArg!==undefined?yArg:s.year),month=(mArg!==undefined?mArg:s.month),mKey=year+"-"+month,md=s.allData[mKey]||{},cfg=s.settings.loan||LOAN_BASE;
-  function g(f,fb){return md[f]!==undefined?md[f]:fb;}
+  function g(f,fb){var v=md[f];return(v!==undefined&&v!==null&&v!=="") ? v : fb;}
   var wS=N(g("wifeSalary",0),0),hS=N(g("husbandSalary",0),0);
   var exTog=activeItems(s.settings.husband.expenseToggle,year,month);
   var t1=g("tteok1Active",false),t2=g("tteok2Active",false);
